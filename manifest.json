@@ -7,7 +7,6 @@
   "permissions": [
     "activeTab",
     "scripting",
-    "storage",
     "downloads"
   ],
   "host_permissions": [
@@ -37,16 +36,8 @@
   },
 
   "action": {
-    "default_title": "Visual Annotator",
-    "default_popup": "popup.html"
+    "default_title": "Visual Annotator"
   },
-
-  "web_accessible_resources": [
-    {
-      "resources": ["console-capture.js"],
-      "matches": ["<all_urls>"]
-    }
-  ],
 
   "icons": {
     "16": "icons/icon16.png",

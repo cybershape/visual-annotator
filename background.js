@@ -36,6 +36,11 @@ async function toggleToolbar(tab) {
   chrome.tabs.sendMessage(tab.id, { type: "TOGGLE_TOOLBAR" });
 }
 
+// Extension icon click
+chrome.action.onClicked.addListener((tab) => {
+  toggleToolbar(tab);
+});
+
 // Keyboard shortcut
 chrome.commands.onCommand.addListener(async (command) => {
   if (command === "toggle-toolbar") {

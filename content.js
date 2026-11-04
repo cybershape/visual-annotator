@@ -37,10 +37,6 @@
 
   let toolbarVisible = false;
   let isAnnotating = false;
-  let autoCopyEnabled = false;
-  let autoScreenshotEnabled = false;
-  let lastIntent = "fix";
-  let lastSeverity = "important";
   let annotations = [];
   let nextId = 1;
 
@@ -57,13 +53,9 @@
   let popupHost = null;
   let globalStyleEl = null;
 
-  // Console capture
-  const consoleLogs = [];
-
   // Toolbar buttons
   let annotateBtn = null;
   let copyBtn = null;
-  let consoleBtn = null;
 
   // Drag
   let dragging = false;
@@ -143,12 +135,6 @@
   padding: 0 4px; line-height: 1;
 }
 
-.dot {
-  position: absolute; top: -1px; right: -1px;
-  width: 8px; height: 8px; background: #ef4444;
-  border-radius: 50%; pointer-events: none;
-}
-
 .btn.danger { color: var(--muted); opacity: .6; }
 .btn.danger:hover { opacity: 1; color: #ef4444; }
 
@@ -198,7 +184,7 @@
 }
 
 .popup {
-  width: 360px; background: var(--bg); border: 1px solid var(--border);
+  width: 520px; background: var(--bg); border: 1px solid var(--border);
   border-radius: 12px; box-shadow: var(--shadow); padding: 16px;
   font-size: 13px; color: var(--text);
   animation: pop .12s ease;
@@ -220,52 +206,6 @@
 }
 .close-btn:hover { color: #ef4444; background: var(--bg2); }
 
-.label {
-  font-size:10px; font-weight:700; text-transform:uppercase;
-  letter-spacing:.05em; color:var(--muted); margin-bottom:4px;
-}
-.row { display:flex; gap:6px; margin-bottom:10px; }
-.chips { display:flex; gap:4px; flex-wrap:wrap; }
-
-.chip {
-  font-size:11px; padding:3px 10px; border-radius:12px;
-  border:1px solid var(--border); background:transparent;
-  color:var(--muted); cursor:pointer; transition:all .12s;
-}
-.chip:hover { border-color:var(--accent); color:var(--accent); }
-.chip.sel { background:var(--accent); border-color:var(--accent); color:#fff; }
-.chip.blocking.sel  { background:#ef4444; border-color:#ef4444; }
-.chip.important.sel { background:#f97316; border-color:#f97316; }
-.chip.suggestion.sel{ background:#22c55e; border-color:#22c55e; }
-
-.screenshot-row { margin-bottom: 10px; }
-.btn-capture {
-  display: flex; align-items: center; gap: 6px;
-  width: 100%; padding: 8px 10px;
-  border: 1px dashed var(--border); border-radius: 6px;
-  background: var(--bg2); color: var(--muted);
-  font-size: 12px; font-family: inherit; cursor: pointer;
-  transition: border-color .15s, color .15s;
-}
-.btn-capture:hover { border-color: var(--accent); color: var(--accent); }
-
-.screenshot-preview {
-  position: relative; border-radius: 6px; overflow: hidden;
-  border: 1px solid var(--border);
-}
-.screenshot-preview img {
-  display: block; width: 100%; max-height: 180px;
-  object-fit: contain; background: var(--bg2);
-}
-.screenshot-remove {
-  position: absolute; top: 4px; right: 4px;
-  width: 20px; height: 20px; border-radius: 50%; border: none;
-  background: rgba(0,0,0,.6); color: #fff; font-size: 12px;
-  cursor: pointer; display: flex; align-items: center; justify-content: center;
-  padding: 0;
-}
-.screenshot-remove:hover { background: #ef4444; }
-
 textarea {
   width:100%; min-height:80px; resize:vertical;
   border:1px solid var(--border); border-radius:8px;
@@ -276,12 +216,12 @@ textarea {
 textarea:focus { border-color:var(--accent); }
 textarea::placeholder { color:var(--muted); }
 
-.actions { display:flex; justify-content:flex-end; gap:8px; }
+.actions { display:flex; justify-content:flex-end; gap:6px; flex-wrap:wrap; }
 
 .btn-secondary {
-  padding:7px 16px; border-radius:6px; border:1px solid var(--border);
+  padding:7px 12px; border-radius:6px; border:1px solid var(--border);
   background:transparent; color:var(--muted); font-size:12px;
-  font-family:inherit; cursor:pointer;
+  font-family:inherit; cursor:pointer; white-space:nowrap;
 }
 .btn-secondary:hover { border-color:var(--muted); color:var(--text); }
 
@@ -320,7 +260,6 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
     minimize: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="7 13 12 18 17 13"/><line x1="12" y1="6" x2="12" y2="18"/></svg>`,
     logo: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>`,
     camera: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>`,
-    console: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>`,
     grip: `<svg width="16" height="6" viewBox="0 0 16 6" fill="currentColor"><circle cx="4" cy="1.5" r="1.2"/><circle cx="8" cy="1.5" r="1.2"/><circle cx="12" cy="1.5" r="1.2"/><circle cx="4" cy="4.5" r="1.2"/><circle cx="8" cy="4.5" r="1.2"/><circle cx="12" cy="4.5" r="1.2"/></svg>`,
   };
 
@@ -331,13 +270,13 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
     if (msg.type === "SHOW_TOOLBAR") { if (!toolbarVisible) showToolbar(); }
     if (msg.type === "HIDE_TOOLBAR") hideToolbar();
     if (msg.type === "PING") sendResponse("PONG");
-    if (msg.type === "GET_STATE") sendResponse({ toolbarVisible });
   });
 
   // ─── Toolbar ─────────────────────────────────────────────────────────
 
   function toggleToolbar() {
-    if (!toolbarVisible) showToolbar();
+    if (toolbarVisible) { hideToolbar(); return; }
+    showToolbar();
     if (!isAnnotating) toggleAnnotateMode();
   }
 
@@ -413,12 +352,11 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
 
       annotateBtn = makeBtn(ICONS.annotate, `Annotate (${IS_MAC ? "⌘" : "Ctrl"}+Shift+.)`, () => toggleAnnotateMode());
       copyBtn = makeBtn(ICONS.copy, "Copy as markdown", () => copyMarkdown());
-      consoleBtn = makeBtn(ICONS.console, "Copy console logs", () => copyConsoleLogs());
       const clearBtn = makeBtn(ICONS.clear, "Clear all (X)", () => clearAll());
       clearBtn.classList.add("danger");
       const minBtn = makeBtn(ICONS.minimize, "Minimize", () => setMinimized(true));
 
-      bar.append(annotateBtn, mkDiv(), copyBtn, consoleBtn, mkDiv(), clearBtn, mkDiv(), minBtn);
+      bar.append(annotateBtn, mkDiv(), copyBtn, mkDiv(), clearBtn, mkDiv(), minBtn);
 
       // FAB
       const fab = document.createElement("button");
@@ -634,11 +572,21 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
 
   let currentScreenshot = null;   // base64 for popup preview
   let currentScreenshotPath = null; // saved file path
+  let lastCopiedMd = null;          // markdown from previous copy action
 
-  function showPopup(el, existing) {
+  async function showPopup(el, existing) {
     closePopup();
     currentScreenshot = existing?.screenshot || null;
     currentScreenshotPath = existing?.screenshotPath || null;
+
+    // Detect if clipboard still holds the last copied export
+    let clipboardHasLastCopy = false;
+    if (lastCopiedMd && annotations.length) {
+      try {
+        const clip = await navigator.clipboard.readText();
+        clipboardHasLastCopy = clip === lastCopiedMd;
+      } catch { clipboardHasLastCopy = false; }
+    }
 
     popupHost = document.createElement("div");
     popupHost.setAttribute("data-va", "popup");
@@ -653,8 +601,6 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
     const clsAttr = el.classList.length ? `.${Array.from(el.classList).slice(0, 2).join(".")}` : "";
     const label = `<${tag}${idAttr}${clsAttr}>`;
 
-    const intent = existing?.intent || lastIntent;
-    const severity = existing?.severity || lastSeverity;
     const comment = existing?.comment || "";
 
     const popup = document.createElement("div");
@@ -664,107 +610,54 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
         <span class="el-tag">${esc(label)}</span>
         <button class="close-btn" id="close">×</button>
       </div>
-      <div class="row">
-        <div style="flex:1">
-          <div class="label">Intent</div>
-          <div class="chips" id="intents">
-            <button class="chip ${intent === "fix" ? "sel" : ""}" data-v="fix">Fix</button>
-            <button class="chip ${intent === "change" ? "sel" : ""}" data-v="change">Change</button>
-            <button class="chip ${intent === "question" ? "sel" : ""}" data-v="question">Question</button>
-            <button class="chip ${intent === "approve" ? "sel" : ""}" data-v="approve">Approve</button>
-            <button class="chip ${intent === "copy" ? "sel" : ""}" data-v="copy">Copy</button>
-          </div>
-        </div>
-        <div style="flex:1">
-          <div class="label">Severity</div>
-          <div class="chips" id="severities">
-            <button class="chip blocking ${severity === "blocking" ? "sel" : ""}" data-v="blocking">Blocking</button>
-            <button class="chip important ${severity === "important" ? "sel" : ""}" data-v="important">Important</button>
-            <button class="chip suggestion ${severity === "suggestion" ? "sel" : ""}" data-v="suggestion">Suggestion</button>
-          </div>
-        </div>
-      </div>
-      <div id="copy-options" style="display:${intent === "copy" ? "block" : "none"};margin-bottom:10px;">
-        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer;">
-          <input type="checkbox" id="include-html" ${existing ? (existing.includeHtml ? "checked" : "") : "checked"} style="accent-color:var(--accent);">
-          Include full HTML DOM of element
-        </label>
-      </div>
-      <div class="screenshot-row" id="ss-slot"></div>
       <textarea id="comment" placeholder="Describe the issue or desired change...">${esc(comment)}</textarea>
+      ${clipboardHasLastCopy ? `
+      <div style="margin-bottom:10px;">
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer;">
+          <input type="checkbox" id="append-existing" checked style="accent-color:var(--accent);">
+          Add to existing annotations
+        </label>
+      </div>` : ""}
       <div class="actions">
-        ${existing ? `<button class="btn-secondary" id="remove" style="margin-right:auto;color:#ef4444;border-color:#ef4444;">Remove</button>` : ""}
         <button class="btn-secondary" id="cancel">Cancel</button>
-        <button class="btn-primary" id="submit">${existing ? "Update" : "Add"}</button>
+        <button class="btn-secondary" id="copy-ss-next" style="display:flex;align-items:center;gap:5px;">${ICONS.camera}Copy & Next</button>
+        <button class="btn-secondary" id="copy-next">Copy & Next</button>
+        <button class="btn-secondary" id="copy-ss" style="display:flex;align-items:center;gap:5px;">${ICONS.camera}Copy</button>
+        <button class="btn-primary" id="copy">Copy</button>
       </div>
     `;
     shadow.appendChild(popup);
 
     const q = (s) => shadow.querySelector(s);
 
-    // Screenshot slot rendering
-    function renderScreenshotSlot() {
-      const slot = q("#ss-slot");
-      if (currentScreenshot) {
-        slot.innerHTML = `<div class="screenshot-preview"><img src="${currentScreenshot}"><button class="screenshot-remove" id="ss-remove">×</button></div>`;
-        q("#ss-remove").addEventListener("click", () => { currentScreenshot = null; currentScreenshotPath = null; renderScreenshotSlot(); });
-      } else {
-        slot.innerHTML = `<button class="btn-capture" id="ss-capture">${ICONS.camera} Capture screenshot</button>`;
-        q("#ss-capture").addEventListener("click", async () => {
-          popupHost.style.visibility = "hidden";
-          const dataUrl = await captureScreenshot(el);
-          popupHost.style.visibility = "";
-          if (dataUrl) {
-            currentScreenshot = dataUrl;
-            currentScreenshotPath = await saveScreenshotFile(dataUrl);
-            renderScreenshotSlot();
-          }
-        });
-      }
-    }
-    renderScreenshotSlot();
-
-    // Auto screenshot
-    if (autoScreenshotEnabled && !currentScreenshot) {
-      (async () => {
+    async function submitAndCopy(withScreenshot, keepAnnotating) {
+      if (withScreenshot && !currentScreenshot) {
         popupHost.style.visibility = "hidden";
         const dataUrl = await captureScreenshot(el);
         popupHost.style.visibility = "";
         if (dataUrl) {
           currentScreenshot = dataUrl;
           currentScreenshotPath = await saveScreenshotFile(dataUrl);
-          renderScreenshotSlot();
         }
-      })();
+      }
+      submitAnnotation(el, existing);
+      await copyMarkdown();
+      if (!keepAnnotating) {
+        annotations = [];
+        syncMarkers(); updateBadge(); updateFabBadge();
+        hideToolbar();
+      }
     }
 
     // Wire events
     q("#close").addEventListener("click", closePopup);
     q("#cancel").addEventListener("click", closePopup);
-    q("#submit").addEventListener("click", () => submitAnnotation(el, existing));
-
-    if (q("#remove")) q("#remove").addEventListener("click", () => {
-      annotations = annotations.filter((a) => a !== existing);
-      closePopup(); syncMarkers(); updateBadge(); updateFabBadge();
-    });
-
-    q("#intents").addEventListener("click", (e) => {
-      const chip = e.target.closest(".chip");
-      if (!chip) return;
-      q("#intents").querySelectorAll(".chip").forEach((c) => c.classList.remove("sel"));
-      chip.classList.add("sel");
-      q("#copy-options").style.display = chip.dataset.v === "copy" ? "block" : "none";
-    });
-
-    q("#severities").addEventListener("click", (e) => {
-      const chip = e.target.closest(".chip");
-      if (!chip) return;
-      q("#severities").querySelectorAll(".chip").forEach((c) => c.classList.remove("sel"));
-      chip.classList.add("sel");
-    });
+    q("#copy").addEventListener("click", () => submitAndCopy(false, false));
+    q("#copy-ss").addEventListener("click", () => submitAndCopy(true, false));
+    q("#copy-next").addEventListener("click", () => submitAndCopy(false, true));
+    q("#copy-ss-next").addEventListener("click", () => submitAndCopy(true, true));
 
     popup.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { submitAnnotation(el, existing); e.preventDefault(); }
       if (e.key === "Escape") { closePopup(); e.stopPropagation(); }
       e.stopPropagation();
     });
@@ -773,7 +666,7 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
     const rect = el.getBoundingClientRect();
     let px = rect.right + 12;
     let py = rect.top;
-    if (px + 380 > window.innerWidth) px = Math.max(8, rect.left - 380);
+    if (px + 540 > window.innerWidth) px = Math.max(8, rect.left - 540);
     if (py + 420 > window.innerHeight) py = Math.max(8, window.innerHeight - 420);
     Object.assign(popupHost.style, { position: "fixed", zIndex: Z_POPUP, left: `${px}px`, top: `${py}px` });
 
@@ -792,23 +685,20 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
     if (!popupHost) return;
     const shadow = popupHost.shadowRoot;
     const comment = shadow.querySelector("#comment").value.trim();
-    const intent = shadow.querySelector("#intents .chip.sel")?.dataset.v || "fix";
-    const severity = shadow.querySelector("#severities .chip.sel")?.dataset.v || "important";
-    const includeHtml = intent === "copy" && !!shadow.querySelector("#include-html")?.checked;
-    lastIntent = intent;
-    lastSeverity = severity;
-
+    const appendExisting = shadow.querySelector("#append-existing");
+    if (appendExisting && !appendExisting.checked) {
+      annotations = [];
+      nextId = 1;
+    }
 
     const rect = el.getBoundingClientRect();
 
+    if (existing && !annotations.includes(existing)) existing = null;
+
     if (existing) {
       existing.comment = comment;
-      existing.intent = intent;
-      existing.severity = severity;
       existing.screenshot = currentScreenshot;
       existing.screenshotPath = currentScreenshotPath;
-      existing.includeHtml = includeHtml;
-      existing.html = includeHtml ? el.outerHTML : null;
     } else {
       annotations.push({
         id: nextId++,
@@ -825,11 +715,9 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
           height: Math.round(rect.height),
         },
         url: window.location.href,
-        comment, intent, severity,
+        comment,
         screenshot: currentScreenshot,
         screenshotPath: currentScreenshotPath,
-        includeHtml: includeHtml,
-        html: includeHtml ? el.outerHTML : null,
         shopifySection: detectShopifySection(el),
         keyStyles: getKeyStyles(el),
       });
@@ -839,7 +727,6 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
     syncMarkers();
     updateBadge();
     updateFabBadge();
-    if (autoCopyEnabled) copyMarkdown();
   }
 
   // ─── Markers ─────────────────────────────────────────────────────────
@@ -1033,13 +920,12 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
 
     md += `---\n\n`;
 
+    const single = annotations.length === 1;
     annotations.forEach((a, i) => {
       const label = a.idAttr ? `#${a.idAttr}` : `${a.tag}${a.classes[0] ? "." + a.classes[0] : ""}`;
-      md += `## ${i + 1}. \`${label}\` [${a.intent} · ${a.severity}]\n\n`;
-      if (a.comment) md += `- **Comment:** ${a.comment}\n`;
+      if (!single) md += `## ${i + 1}. \`${label}\`\n\n`;
       if (a.shopifySection?.file) md += `- **Shopify Section:** \`${a.shopifySection.file}\`\n`;
-      if (a.url) md += `- **URL:** ${a.url}\n`;
-      md += `- **Element:** \`<${a.tag}${a.idAttr ? ` id="${a.idAttr}"` : ""}${a.classes.length ? ` class="${a.classes.join(" ")}"` : ""}>\`\n`;
+      if (a.url && a.url !== url) md += `- **URL:** ${a.url}\n`;
       md += `- **Selector:** \`${a.selector}\`\n`;
       if (a.text) md += `- **Text:** "${a.text.slice(0, 100)}${a.text.length > 100 ? "..." : ""}"\n`;
       md += `- **Bounding Box:** ${a.rect.width}×${a.rect.height} at (${a.rect.x}, ${a.rect.y})\n`;
@@ -1048,7 +934,7 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
       }
       if (a.screenshotPath) md += `- **Screenshot:** ![screenshot-${i + 1}](${a.screenshotPath})\n`;
       else if (a.screenshot) md += `- **Screenshot:** [image attached]\n`;
-      if (a.html) md += `- **HTML:**\n\`\`\`html\n${a.html}\n\`\`\`\n`;
+      if (a.comment) md += `- **User Request:** ${a.comment}\n`;
       md += `\n---\n\n`;
     });
 
@@ -1059,72 +945,16 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
     const md = exportMarkdown();
     try {
       await navigator.clipboard.writeText(md);
+      lastCopiedMd = md;
     } catch {
       const ta = document.createElement("textarea");
       ta.value = md; ta.style.cssText = "position:fixed;left:-9999px;top:-9999px";
       document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove();
+      lastCopiedMd = md;
     }
     if (copyBtn) {
       copyBtn.innerHTML = ICONS.check;
       setTimeout(() => { copyBtn.innerHTML = ICONS.copy; }, 1500);
-    }
-  }
-
-  // ─── Console Capture ─────────────────────────────────────────────────
-
-  // Inject page-level script to intercept console calls
-  const captureScript = document.createElement("script");
-  captureScript.src = chrome.runtime.getURL("console-capture.js");
-  document.documentElement.appendChild(captureScript);
-  captureScript.onload = () => captureScript.remove();
-
-  window.addEventListener("message", (e) => {
-    if (e.data?.type === "__VA_CONSOLE__") {
-      consoleLogs.push({ level: e.data.level, text: e.data.parts.join(" "), ts: e.data.ts });
-      if (e.data.level === "error" && consoleBtn) {
-        if (!consoleBtn.querySelector(".dot")) {
-          const dot = document.createElement("span");
-          dot.className = "dot";
-          consoleBtn.appendChild(dot);
-        }
-      }
-    }
-  });
-
-  function exportConsoleLogs() {
-    const url = window.location.href;
-    const errors = consoleLogs.filter((l) => l.level === "error").length;
-    const warns = consoleLogs.filter((l) => l.level === "warn").length;
-
-    let md = `# Console Output — ${document.title}\n`;
-    md += `**URL:** ${url}\n`;
-    md += `**Messages:** ${consoleLogs.length}`;
-    if (errors || warns) md += ` (${errors} errors, ${warns} warnings)`;
-    md += `\n\n---\n\n`;
-
-    if (!consoleLogs.length) { md += "*No console messages captured*\n"; return md; }
-
-    consoleLogs.forEach((entry) => {
-      const time = new Date(entry.ts).toLocaleTimeString("de-DE", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit", fractionalSecondDigits: 3 });
-      md += `[${entry.level.toUpperCase()}] ${time}\n${entry.text}\n\n`;
-    });
-
-    return md;
-  }
-
-  async function copyConsoleLogs() {
-    const md = exportConsoleLogs();
-    try {
-      await navigator.clipboard.writeText(md);
-    } catch {
-      const ta = document.createElement("textarea");
-      ta.value = md; ta.style.cssText = "position:fixed;left:-9999px;top:-9999px";
-      document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove();
-    }
-    if (consoleBtn) {
-      consoleBtn.querySelector(".dot")?.remove();
-      consoleBtn.innerHTML = ICONS.check;
-      setTimeout(() => { consoleBtn.innerHTML = ICONS.console; }, 1500);
     }
   }
 
@@ -1143,20 +973,6 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
     const k = e.key.toLowerCase();
     if (k === "a" && !e.metaKey && !e.ctrlKey) { toggleAnnotateMode(); e.preventDefault(); }
     if (k === "x" && !e.metaKey && !e.ctrlKey) { clearAll(); e.preventDefault(); }
-  });
-
-  // ─── Settings ────────────────────────────────────────────────────────
-
-  chrome.storage.local.get(["alwaysOn", "autoCopy", "autoScreenshot"], (result) => {
-    if (result.alwaysOn) showToolbar();
-    autoCopyEnabled = !!result.autoCopy;
-    autoScreenshotEnabled = !!result.autoScreenshot;
-  });
-
-  chrome.storage.onChanged.addListener((changes) => {
-    if (changes.alwaysOn && changes.alwaysOn.newValue && !toolbarVisible) showToolbar();
-    if (changes.autoCopy) autoCopyEnabled = !!changes.autoCopy.newValue;
-    if (changes.autoScreenshot) autoScreenshotEnabled = !!changes.autoScreenshot.newValue;
   });
 
 })();
