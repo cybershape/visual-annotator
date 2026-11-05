@@ -31,12 +31,12 @@
         "default": "Ctrl+Shift+Period",
         "mac": "Command+Shift+Period"
       },
-      "description": "Toggle annotation toolbar"
+      "description": "Toggle element selection"
     }
   },
 
   "action": {
-    "default_title": "Visual Annotator"
+    "default_title": "Visual Annotator — Click to select an element"
   },
 
   "icons": {

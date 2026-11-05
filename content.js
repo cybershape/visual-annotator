@@ -1,7 +1,7 @@
 /**
  * Visual Annotator — Content Script (v1.0.0)
  *
- * Universal annotation toolbar for any web page.
+ * Universal element annotation for any web page.
  * Click elements, add comments, copy as structured markdown.
  * Paste into any AI coding agent.
  *
@@ -19,7 +19,6 @@
   const TEXT_MAX = 200;
   const Z_HIGHLIGHT = 2147483644;
   const Z_MARKERS = 2147483645;
-  const Z_TOOLBAR = 2147483646;
   const Z_POPUP = 2147483647;
 
   function esc(s) {
@@ -35,7 +34,6 @@
 
   // ─── State ───────────────────────────────────────────────────────────
 
-  let toolbarVisible = false;
   let isAnnotating = false;
   let annotations = [];
   let nextId = 1;
@@ -45,119 +43,11 @@
   let stackIdx = 0;
 
   // DOM refs
-  let toolbarHost = null;
-  let toolbarShadow = null;
   let highlightEl = null;
   let tooltipEl = null;
   let markersContainer = null;
   let popupHost = null;
   let globalStyleEl = null;
-
-  // Toolbar buttons
-  let annotateBtn = null;
-  let copyBtn = null;
-
-  // Drag
-  let dragging = false;
-  let dragOffset = { x: 0, y: 0 };
-  let minimized = false;
-
-  // ─── Styles ──────────────────────────────────────────────────────────
-
-  const TOOLBAR_CSS = `
-:host {
-  all: initial;
-  display: block;
-  position: fixed;
-  z-index: ${Z_TOOLBAR};
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-}
-* { box-sizing: border-box; }
-
-:host {
-  --bg: #1c1c1e; --bg2: #2c2c2e; --border: #38383a;
-  --text: #f4f4f5; --muted: #a1a1aa;
-  --accent: #6366f1; --accent-h: #4f46e5;
-  --shadow: 0 8px 32px rgba(0,0,0,.4), 0 0 0 1px rgba(255,255,255,.06);
-}
-@media (prefers-color-scheme: light) {
-  :host {
-    --bg: #ffffff; --bg2: #f4f4f5; --border: #e4e4e7;
-    --text: #18181b; --muted: #71717a;
-    --accent: #6366f1; --accent-h: #4f46e5;
-    --shadow: 0 8px 32px rgba(0,0,0,.08), 0 0 0 1px rgba(0,0,0,.04);
-  }
-}
-
-.toolbar {
-  display: flex; flex-direction: column; align-items: center; gap: 2px;
-  background: var(--bg); border-radius: 14px; padding: 6px;
-  box-shadow: var(--shadow); user-select: none;
-}
-
-.drag-handle {
-  display: flex; align-items: center; justify-content: center;
-  width: 100%; height: 12px; cursor: grab; opacity: 0.35;
-  transition: opacity 0.15s; margin-bottom: 2px;
-}
-.drag-handle:hover { opacity: 0.7; }
-.drag-handle:active { cursor: grabbing; opacity: 0.9; }
-
-.btn {
-  display: flex; align-items: center; justify-content: center;
-  width: 36px; height: 36px; border-radius: 8px; border: none;
-  background: transparent; color: var(--muted); cursor: pointer;
-  padding: 0; position: relative; transition: background .15s, color .15s;
-}
-.btn svg { display: block; }
-.btn:hover { background: var(--bg2); color: var(--text); }
-
-.btn[data-tip]::before {
-  content: attr(data-tip);
-  position: absolute; right: calc(100% + 10px); top: 50%;
-  transform: translateY(-50%); white-space: nowrap;
-  font-size: 11px; padding: 4px 8px; border-radius: 6px;
-  background: var(--text); color: var(--bg);
-  pointer-events: none; opacity: 0; transition: opacity .12s;
-}
-.btn[data-tip]:hover::before { opacity: 1; }
-
-.btn.active { background: var(--accent); color: #fff; }
-.btn.active:hover { background: var(--accent-h); }
-
-.divider { width: 20px; height: 1px; background: var(--border); margin: 3px 0; }
-
-.badge {
-  position: absolute; top: -3px; right: -3px;
-  min-width: 16px; height: 16px; background: #ef4444; color: #fff;
-  border-radius: 8px; font-size: 10px; font-weight: 600;
-  display: flex; align-items: center; justify-content: center;
-  padding: 0 4px; line-height: 1;
-}
-
-.btn.danger { color: var(--muted); opacity: .6; }
-.btn.danger:hover { opacity: 1; color: #ef4444; }
-
-/* Minimized FAB */
-.fab {
-  display: none; align-items: center; justify-content: center;
-  width: 36px; height: 36px; border-radius: 50%; border: none;
-  background: var(--bg); color: var(--muted);
-  box-shadow: var(--shadow); cursor: pointer; padding: 0;
-  transition: color .15s, transform .15s; position: relative;
-}
-.fab:hover { color: var(--accent); transform: scale(1.1); }
-.fab .fab-badge {
-  position: absolute; top: -4px; right: -4px;
-  min-width: 16px; height: 16px; background: var(--accent); color: #fff;
-  border-radius: 8px; font-size: 9px; font-weight: 700;
-  display: flex; align-items: center; justify-content: center;
-  padding: 0 3px; line-height: 1;
-}
-
-.minimized .toolbar { display: none; }
-.minimized .fab { display: flex; }
-  `;
 
   const POPUP_CSS = `
 :host {
@@ -184,7 +74,7 @@
 }
 
 .popup {
-  width: 520px; max-width:calc(100vw - 16px); max-height:calc(100vh - 16px); overflow:auto;
+  width: 600px; max-width:calc(100vw - 16px); max-height:calc(100vh - 16px); overflow:auto;
   background: var(--bg); border: 1px solid var(--border);
   border-radius: 12px; box-shadow: var(--shadow); padding: 16px;
   font-size: 13px; color: var(--text);
@@ -263,45 +153,19 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
   // ─── Icons ───────────────────────────────────────────────────────────
 
   const ICONS = {
-    annotate: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>`,
-    screenshot: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>`,
-    copy: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`,
-    check: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
-    clear: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`,
-    minimize: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="7 13 12 18 17 13"/><line x1="12" y1="6" x2="12" y2="18"/></svg>`,
-    logo: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>`,
     camera: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>`,
-    grip: `<svg width="16" height="6" viewBox="0 0 16 6" fill="currentColor"><circle cx="4" cy="1.5" r="1.2"/><circle cx="8" cy="1.5" r="1.2"/><circle cx="12" cy="1.5" r="1.2"/><circle cx="4" cy="4.5" r="1.2"/><circle cx="8" cy="4.5" r="1.2"/><circle cx="12" cy="4.5" r="1.2"/></svg>`,
   };
 
   // ─── Message Handling ────────────────────────────────────────────────
 
   chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-    if (msg.type === "TOGGLE_TOOLBAR") toggleToolbar();
-    if (msg.type === "SHOW_TOOLBAR") { if (!toolbarVisible) showToolbar(); }
-    if (msg.type === "HIDE_TOOLBAR") hideToolbar();
+    if (msg.type === "TOGGLE_ANNOTATING") {
+      if (isAnnotating) stopAnnotating(); else startAnnotating();
+    }
     if (msg.type === "PING") sendResponse("PONG");
   });
 
-  // ─── Toolbar ─────────────────────────────────────────────────────────
-
-  function isToolbarVisible() {
-    if (!toolbarHost?.isConnected) return false;
-    const style = window.getComputedStyle(toolbarHost);
-    if (style.display === "none" || style.visibility === "hidden" || style.visibility === "collapse" || Number(style.opacity) === 0) return false;
-    const rect = toolbarHost.getBoundingClientRect();
-    return rect.width > 0 && rect.height > 0 && rect.left < window.innerWidth && rect.right > 0 && rect.top < window.innerHeight && rect.bottom > 0;
-  }
-
-  function toggleToolbar() {
-    if (toolbarVisible && isToolbarVisible()) { hideToolbar(); return; }
-    showToolbar();
-    if (!isAnnotating) toggleAnnotateMode();
-  }
-
-  function showToolbar() {
-    toolbarVisible = true;
-
+  function startAnnotating() {
     // Global styles
     if (!globalStyleEl) {
       globalStyleEl = document.createElement("style");
@@ -346,150 +210,33 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
       document.body.appendChild(markersContainer);
     }
 
-    // Toolbar (Shadow DOM)
-    if (!toolbarHost) {
-      toolbarHost = document.createElement("div");
-      toolbarHost.setAttribute("data-va", "toolbar");
-      toolbarShadow = toolbarHost.attachShadow({ mode: "open" });
-
-      const style = document.createElement("style");
-      style.textContent = TOOLBAR_CSS;
-      toolbarShadow.appendChild(style);
-
-      const wrapper = document.createElement("div");
-      wrapper.className = minimized ? "minimized" : "";
-      wrapper.id = "va-wrap";
-
-      const bar = document.createElement("div");
-      bar.className = "toolbar";
-
-      const drag = document.createElement("div");
-      drag.className = "drag-handle";
-      drag.innerHTML = ICONS.grip;
-      bar.appendChild(drag);
-
-      annotateBtn = makeBtn(ICONS.annotate, `Annotate (${IS_MAC ? "⌘" : "Ctrl"}+Shift+.)`, () => toggleAnnotateMode());
-      copyBtn = makeBtn(ICONS.copy, "Copy as markdown", () => copyMarkdown());
-      const clearBtn = makeBtn(ICONS.clear, "Clear all (X)", () => clearAll());
-      clearBtn.classList.add("danger");
-      const minBtn = makeBtn(ICONS.minimize, "Minimize", () => setMinimized(true));
-
-      bar.append(annotateBtn, mkDiv(), copyBtn, mkDiv(), clearBtn, mkDiv(), minBtn);
-
-      // FAB
-      const fab = document.createElement("button");
-      fab.className = "fab";
-      fab.title = "Open Visual Annotator";
-      fab.innerHTML = ICONS.logo;
-      fab.addEventListener("click", (e) => { e.stopPropagation(); setMinimized(false); });
-
-      wrapper.append(bar, fab);
-      toolbarShadow.appendChild(wrapper);
-
-      Object.assign(toolbarHost.style, {
-        position: "fixed", zIndex: Z_TOOLBAR,
-        bottom: "16px", right: "16px", top: "auto", left: "auto",
-      });
-
-      setupDrag(drag);
-
-      toolbarHost.addEventListener("click", (e) => e.stopPropagation());
-      toolbarHost.addEventListener("mousedown", (e) => e.stopPropagation());
-      toolbarHost.addEventListener("pointerdown", (e) => e.stopPropagation());
-
-      document.body.appendChild(toolbarHost);
-    }
-
-    if (!toolbarHost.isConnected) document.body.appendChild(toolbarHost);
-    toolbarHost.style.display = "block";
-    toolbarHost.style.visibility = "visible";
-    toolbarHost.style.opacity = "1";
-    if (!isToolbarVisible()) {
-      Object.assign(toolbarHost.style, { bottom: "16px", right: "16px", top: "auto", left: "auto" });
-    }
     if (markersContainer) markersContainer.style.display = "";
     syncMarkers();
+    setAnnotating(true);
   }
 
-  function hideToolbar() {
-    if (!toolbarVisible) return;
-    toolbarVisible = false;
-    if (isAnnotating) toggleAnnotateMode();
-    if (toolbarHost) toolbarHost.style.display = "none";
+  function stopAnnotating() {
+    setAnnotating(false);
     if (markersContainer) markersContainer.style.display = "none";
-    if (highlightEl) highlightEl.style.display = "none";
-    if (tooltipEl) tooltipEl.style.display = "none";
     closePopup();
   }
 
-  function makeBtn(icon, tip, onClick) {
-    const btn = document.createElement("button");
-    btn.className = "btn";
-    btn.setAttribute("data-tip", tip);
-    btn.innerHTML = icon;
-    btn.addEventListener("click", (e) => { e.stopPropagation(); onClick(); });
-    return btn;
-  }
-
-  function mkDiv() {
-    const d = document.createElement("div");
-    d.className = "divider";
-    return d;
-  }
-
-  function setMinimized(v) {
-    minimized = v;
-    const wrap = toolbarShadow?.getElementById("va-wrap");
-    if (wrap) wrap.className = v ? "minimized" : "";
-    updateFabBadge();
-  }
-
-  function updateFabBadge() {
-    if (!toolbarShadow) return;
-    const fab = toolbarShadow.querySelector(".fab");
-    if (!fab) return;
-    let badge = fab.querySelector(".fab-badge");
-    if (annotations.length > 0 && minimized) {
-      if (!badge) { badge = document.createElement("span"); badge.className = "fab-badge"; fab.appendChild(badge); }
-      badge.textContent = annotations.length > 99 ? "99+" : String(annotations.length);
-    } else {
-      badge?.remove();
-    }
-  }
-
-  function updateBadge() {
-    if (!annotateBtn) return;
-    let badge = annotateBtn.querySelector(".badge");
-    if (annotations.length > 0) {
-      if (!badge) { badge = document.createElement("span"); badge.className = "badge"; annotateBtn.appendChild(badge); }
-      badge.textContent = annotations.length > 99 ? "99+" : String(annotations.length);
-    } else {
-      badge?.remove();
-    }
-  }
-
-  function setupDrag(handle) {
-    handle.addEventListener("mousedown", (e) => {
-      dragging = true;
-      const rect = toolbarHost.getBoundingClientRect();
-      dragOffset = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-      e.preventDefault();
-    });
-    document.addEventListener("mousemove", (e) => {
-      if (!dragging) return;
-      Object.assign(toolbarHost.style, {
-        left: `${e.clientX - dragOffset.x}px`, top: `${e.clientY - dragOffset.y}px`,
-        right: "auto", bottom: "auto",
-      });
-    });
-    document.addEventListener("mouseup", () => { dragging = false; });
+  function updateActionState() {
+    chrome.runtime.sendMessage({
+      type: "ANNOTATION_STATE",
+      active: isAnnotating,
+      count: annotations.length,
+    }).catch(() => {});
   }
 
   // ─── Annotate Mode ──────────────────────────────────────────────────
 
-  function toggleAnnotateMode() {
-    isAnnotating = !isAnnotating;
-    annotateBtn?.classList.toggle("active", isAnnotating);
+  function setAnnotating(active) {
+    if (isAnnotating === active) return;
+    isAnnotating = active;
+    hoverStack = [];
+    stackIdx = 0;
+    updateActionState();
     document.body.classList.toggle("va-annotating", isAnnotating);
 
     if (isAnnotating) {
@@ -556,7 +303,7 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
 
   function onAnnotateKeyDown(e) {
     if (e.key === "Escape") {
-      if (popupHost) { closePopup(); } else { hideToolbar(); }
+      if (popupHost) { closePopup(); } else { stopAnnotating(); }
       e.preventDefault();
       e.stopPropagation();
     }
@@ -618,7 +365,7 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
       } catch { clipboardHasLastCopy = false; }
     }
 
-    if (popupHost !== host || !toolbarVisible) return;
+    if (popupHost !== host || !isAnnotating) return;
     popupHost.setAttribute("data-va", "popup");
     const shadow = popupHost.attachShadow({ mode: "open" });
 
@@ -658,8 +405,8 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
         <button class="btn-secondary" id="cancel">Cancel</button>
         <button class="btn-secondary" id="copy-ss-next" style="display:flex;align-items:center;gap:5px;">${ICONS.camera}Copy & Next</button>
         <button class="btn-secondary" id="copy-next">Copy & Next</button>
-        <button class="btn-secondary" id="copy-ss" style="display:flex;align-items:center;gap:5px;">${ICONS.camera}Copy</button>
-        <button class="btn-primary" id="copy">Copy</button>
+        <button class="btn-secondary" id="copy-ss" style="display:flex;align-items:center;gap:5px;">${ICONS.camera}Copy & Exit</button>
+        <button class="btn-primary" id="copy">Copy & Exit</button>
       </div>
     `;
     shadow.appendChild(popup);
@@ -726,8 +473,8 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
         closePopup();
         if (!keepAnnotating) {
           annotations = [];
-          syncMarkers(); updateBadge(); updateFabBadge();
-          hideToolbar();
+          syncMarkers(); updateActionState();
+          stopAnnotating();
         }
       } finally {
         submitting = false;
@@ -758,7 +505,7 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
     host.style.visibility = "";
     const trackHighlight = () => {
       if (popupHost !== host) return;
-      if (toolbarVisible && host.style.visibility !== "hidden" && document.contains(currentEl)) {
+      if (isAnnotating && host.style.visibility !== "hidden" && document.contains(currentEl)) {
         showHighlight(currentEl);
       } else {
         hideHighlight();
@@ -875,8 +622,7 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
 
     if (dismiss) closePopup();
     syncMarkers();
-    updateBadge();
-    updateFabBadge();
+    updateActionState();
   }
 
   // ─── Markers ─────────────────────────────────────────────────────────
@@ -901,7 +647,7 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
   let syncTimer = null;
   function scheduleSyncMarkers() {
     if (syncTimer) return;
-    syncTimer = requestAnimationFrame(() => { syncTimer = null; if (toolbarVisible) syncMarkers(); });
+    syncTimer = requestAnimationFrame(() => { syncTimer = null; if (isAnnotating) syncMarkers(); });
   }
   window.addEventListener("scroll", scheduleSyncMarkers, true);
   window.addEventListener("resize", scheduleSyncMarkers);
@@ -989,7 +735,6 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
     try {
       if (highlightEl) highlightEl.style.display = "none";
       if (tooltipEl) tooltipEl.style.display = "none";
-      if (toolbarHost) toolbarHost.style.display = "none";
       if (markersContainer) markersContainer.style.display = "none";
 
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
@@ -1004,8 +749,7 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
       console.error("[visual-annotator] Screenshot failed:", err);
       return null;
     } finally {
-      if (toolbarHost) toolbarHost.style.display = toolbarVisible ? "" : "none";
-      if (markersContainer) markersContainer.style.display = toolbarVisible ? "" : "none";
+      if (markersContainer) markersContainer.style.display = isAnnotating ? "" : "none";
     }
   }
 
@@ -1113,28 +857,10 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
       }
     }
     lastCopiedMd = md;
-    if (copyBtn) {
-      copyBtn.innerHTML = ICONS.check;
-      setTimeout(() => { copyBtn.innerHTML = ICONS.copy; }, 1500);
-    }
     return true;
   }
 
-  // ─── Clear ───────────────────────────────────────────────────────────
-
-  function clearAll() {
-    annotations = [];
-    syncMarkers(); updateBadge(); updateFabBadge();
-  }
-
-  // ─── Global Keyboard Shortcuts ──────────────────────────────────────
-
-  document.addEventListener("keydown", (e) => {
-    if (!toolbarVisible || isAnnotating) return;
-    if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.isContentEditable) return;
-    const k = e.key.toLowerCase();
-    if (k === "a" && !e.metaKey && !e.ctrlKey) { toggleAnnotateMode(); e.preventDefault(); }
-    if (k === "x" && !e.metaKey && !e.ctrlKey) { clearAll(); e.preventDefault(); }
-  });
+  window.addEventListener("pageshow", updateActionState);
+  updateActionState();
 
 })();

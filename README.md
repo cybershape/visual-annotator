@@ -67,35 +67,26 @@ To update after pulling new changes:
 
 ## Usage
 
-1. **Toggle toolbar** — Click the extension icon or press `Cmd+Shift+.` (Mac) / `Ctrl+Shift+.` (Windows/Linux)
-2. **Annotate** — Click the pen icon (or press `A`), then click any element on the page
-3. **Comment** — Optionally add a description, select intent and severity
-4. **Intent** — Choose Fix, Change, Question, Approve, or **Copy** (to grab the element's HTML DOM)
-5. **Screenshot** — Capture a cropped screenshot of the element directly in the annotation popup
-6. **Copy** — Click the copy icon to get all annotations as structured markdown in your clipboard
-6. **Console** — Click the terminal icon to copy all captured console logs as markdown
-7. **Paste** — Into any AI agent prompt
+1. **Start selecting** — Click the extension icon or press `Cmd+Shift+.` (Mac) / `Ctrl+Shift+.` (Windows/Linux), then click an element on the page
+2. **Comment** — Optionally describe the issue or desired change in the annotation popup
+3. **Copy & Exit** — Copy the current batch as markdown, clear its page markers, and exit selection mode; use the camera version to include a screenshot
+4. **Copy & Next** — Copy the current batch and continue selecting elements; numbered markers let you edit annotations already in the batch
+5. **Start a new batch** — After Copy & Next, uncheck **Add to existing annotations** in the next popup to replace the batch, when this option is available
+6. **Paste** — Into any AI agent prompt
+7. **Exit selecting** — Click the extension icon again, use the shortcut, or press `Escape` when no annotation popup is open
 
-## Extension Popup
+## Extension Icon
 
-Click the extension icon to open the popup with these options:
+The browser extension icon is the entry point; no floating toolbar is added to the page. Pin the extension for quick access.
 
-| Option | Description |
-|--------|-------------|
-| Show/Hide Toolbar | Toggle the annotation toolbar on the current page |
-| Always On | Automatically show the toolbar on every page |
-| Auto Copy | Automatically copy markdown to clipboard after each annotation |
-| Auto Screenshot | Automatically capture a screenshot with each annotation |
+| Badge | Meaning |
+|-------|---------|
+| Purple `ON` | Selection mode is active with no annotations |
+| Purple number | Selection mode is active; the number is the annotation count |
+| Gray number | Selection mode is off; the current batch is retained |
+| No badge | Selection mode is off with no annotations |
 
-## Toolbar Buttons
-
-| Button | Key | Description |
-|--------|-----|-------------|
-| Annotate | `A` | Toggle element picker mode |
-| Copy | — | Copy all annotations as markdown |
-| Console | — | Copy browser console logs as markdown |
-| Clear | `X` | Remove all annotations |
-| Minimize | — | Collapse toolbar to a small floating button |
+Hover over the extension icon to see its current state. Badge state is specific to each tab and resets when the page reloads.
 
 ## Element Picker
 
@@ -177,14 +168,13 @@ App initialized
 
 ## Keyboard Shortcuts
 
-All shortcuts only work when the toolbar is visible and no text input is focused.
+The extension shortcut toggles selection mode. Popup shortcuts work while annotating.
 
 | Shortcut | Action |
 |----------|--------|
-| `Cmd/Ctrl+Shift+.` | Open toolbar + start annotating |
-| `A` | Toggle annotate mode |
-| `X` | Clear all annotations |
-| `Escape` | Exit annotate mode or close popup |
+| `Cmd/Ctrl+Shift+.` | Start or exit element selection |
+| `Cmd/Ctrl+Enter` | Copy and finish from the comment field |
+| `Escape` | Close the popup first; press again to exit selection |
 
 > **Tip:** By default the shortcut only works when Chrome is focused. To make it work globally (from any app), go to `chrome://extensions/shortcuts`, find **Visual Annotator** and change the scope from "In Chrome" to "Global".
 
