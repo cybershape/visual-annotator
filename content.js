@@ -184,7 +184,8 @@
 }
 
 .popup {
-  width: 520px; background: var(--bg); border: 1px solid var(--border);
+  width: 520px; max-width:calc(100vw - 16px); max-height:calc(100vh - 16px); overflow:auto;
+  background: var(--bg); border: 1px solid var(--border);
   border-radius: 12px; box-shadow: var(--shadow); padding: 16px;
   font-size: 13px; color: var(--text);
   animation: pop .12s ease;
@@ -194,7 +195,17 @@
   to   { opacity:1; transform: scale(1) translateY(0); }
 }
 
-.header { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+.header { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; cursor:grab; user-select:none; touch-action:none; }
+.header:active { cursor:grabbing; }
+.parent-row { margin-bottom:10px; }
+.parent-btn {
+  font-size:11px; padding:2px 10px; border-radius:10px;
+  border:1px solid var(--border); background:transparent; color:var(--muted);
+  font-family:inherit; cursor:pointer;
+}
+.parent-btn:hover:not(:disabled) { border-color:var(--accent); color:var(--accent); }
+.parent-btn:disabled { opacity:.4; cursor:default; }
+.parent-row { display:flex; gap:6px; }
 .el-tag {
   font-size:11px; font-family:ui-monospace,monospace; color:var(--muted);
   background:var(--bg2); border-radius:4px; padding:2px 8px;
@@ -274,14 +285,21 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
 
   // ─── Toolbar ─────────────────────────────────────────────────────────
 
+  function isToolbarVisible() {
+    if (!toolbarHost?.isConnected) return false;
+    const style = window.getComputedStyle(toolbarHost);
+    if (style.display === "none" || style.visibility === "hidden" || style.visibility === "collapse" || Number(style.opacity) === 0) return false;
+    const rect = toolbarHost.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0 && rect.left < window.innerWidth && rect.right > 0 && rect.top < window.innerHeight && rect.bottom > 0;
+  }
+
   function toggleToolbar() {
-    if (toolbarVisible) { hideToolbar(); return; }
+    if (toolbarVisible && isToolbarVisible()) { hideToolbar(); return; }
     showToolbar();
     if (!isAnnotating) toggleAnnotateMode();
   }
 
   function showToolbar() {
-    if (toolbarVisible) return;
     toolbarVisible = true;
 
     // Global styles
@@ -382,7 +400,14 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
       document.body.appendChild(toolbarHost);
     }
 
-    toolbarHost.style.display = "";
+    if (!toolbarHost.isConnected) document.body.appendChild(toolbarHost);
+    toolbarHost.style.display = "block";
+    toolbarHost.style.visibility = "visible";
+    toolbarHost.style.opacity = "1";
+    if (!isToolbarVisible()) {
+      Object.assign(toolbarHost.style, { bottom: "16px", right: "16px", top: "auto", left: "auto" });
+    }
+    if (markersContainer) markersContainer.style.display = "";
     syncMarkers();
   }
 
@@ -391,6 +416,7 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
     toolbarVisible = false;
     if (isAnnotating) toggleAnnotateMode();
     if (toolbarHost) toolbarHost.style.display = "none";
+    if (markersContainer) markersContainer.style.display = "none";
     if (highlightEl) highlightEl.style.display = "none";
     if (tooltipEl) tooltipEl.style.display = "none";
     closePopup();
@@ -506,7 +532,7 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
   }
 
   function onWheel(e) {
-    if (!hoverStack.length || isOurs(e.target)) return;
+    if (popupHost || !hoverStack.length || isOurs(e.target)) return;
     if (!e.altKey) return;
     e.preventDefault(); e.stopPropagation();
     stackIdx = e.deltaY > 0
@@ -530,8 +556,9 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
 
   function onAnnotateKeyDown(e) {
     if (e.key === "Escape") {
-      if (popupHost) { closePopup(); } else { toggleAnnotateMode(); }
+      if (popupHost) { closePopup(); } else { hideToolbar(); }
       e.preventDefault();
+      e.stopPropagation();
     }
   }
 
@@ -573,9 +600,12 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
   let currentScreenshot = null;   // base64 for popup preview
   let currentScreenshotPath = null; // saved file path
   let lastCopiedMd = null;          // markdown from previous copy action
+  let popupHighlightFrame = null;
 
   async function showPopup(el, existing) {
     closePopup();
+    const host = document.createElement("div");
+    popupHost = host;
     currentScreenshot = existing?.screenshot || null;
     currentScreenshotPath = existing?.screenshotPath || null;
 
@@ -588,7 +618,7 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
       } catch { clipboardHasLastCopy = false; }
     }
 
-    popupHost = document.createElement("div");
+    if (popupHost !== host || !toolbarVisible) return;
     popupHost.setAttribute("data-va", "popup");
     const shadow = popupHost.attachShadow({ mode: "open" });
 
@@ -596,10 +626,15 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
     style.textContent = POPUP_CSS;
     shadow.appendChild(style);
 
-    const tag = el.tagName.toLowerCase();
-    const idAttr = el.id ? `#${el.id}` : "";
-    const clsAttr = el.classList.length ? `.${Array.from(el.classList).slice(0, 2).join(".")}` : "";
-    const label = `<${tag}${idAttr}${clsAttr}>`;
+    let currentEl = el;
+    const elHistory = [];
+
+    function elLabel(target) {
+      const tag = target.tagName.toLowerCase();
+      const idAttr = target.id ? `#${target.id}` : "";
+      const clsAttr = target.classList.length ? `.${Array.from(target.classList).slice(0, 2).join(".")}` : "";
+      return `<${tag}${idAttr}${clsAttr}>`;
+    }
 
     const comment = existing?.comment || "";
 
@@ -607,9 +642,10 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
     popup.className = "popup";
     popup.innerHTML = `
       <div class="header">
-        <span class="el-tag">${esc(label)}</span>
+        <span class="el-tag">${esc(elLabel(currentEl))}</span>
         <button class="close-btn" id="close">×</button>
       </div>
+      <div class="parent-row"><button class="parent-btn" id="parent">Parent ↑</button><button class="parent-btn" id="previous">Previous ←</button></div>
       <textarea id="comment" placeholder="Describe the issue or desired change...">${esc(comment)}</textarea>
       ${clipboardHasLastCopy ? `
       <div style="margin-bottom:10px;">
@@ -627,25 +663,75 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
       </div>
     `;
     shadow.appendChild(popup);
+    setupPopupDrag(popup.querySelector(".header"), host);
 
     const q = (s) => shadow.querySelector(s);
 
+    function refreshTarget() {
+      const parent = currentEl.parentElement;
+      q("#parent").disabled = !parent || parent === document.documentElement || parent === document.body || isOurs(parent);
+      q("#previous").disabled = elHistory.length === 0;
+      q(".el-tag").textContent = elLabel(currentEl);
+    }
+
+    function switchTarget(nextEl) {
+      currentEl = nextEl;
+      hoverStack = [nextEl];
+      stackIdx = 0;
+      currentScreenshot = null;
+      currentScreenshotPath = null;
+      refreshTarget();
+      positionPopup(host, popup, currentEl);
+      q("#comment")?.focus({ preventScroll: true });
+    }
+
+    q("#parent").addEventListener("click", () => {
+      const parent = currentEl.parentElement;
+      if (!parent || parent === document.documentElement || parent === document.body || isOurs(parent)) return;
+      elHistory.push(currentEl);
+      switchTarget(parent);
+    });
+
+    q("#previous").addEventListener("click", () => {
+      const prev = elHistory.pop();
+      if (!prev) return;
+      switchTarget(prev);
+    });
+    refreshTarget();
+
+    let submitting = false;
     async function submitAndCopy(withScreenshot, keepAnnotating) {
-      if (withScreenshot && !currentScreenshot) {
-        popupHost.style.visibility = "hidden";
-        const dataUrl = await captureScreenshot(el);
-        popupHost.style.visibility = "";
-        if (dataUrl) {
+      if (submitting || popupHost !== host) return;
+      submitting = true;
+      const buttons = popup.querySelectorAll(".actions button");
+      buttons.forEach((button) => { button.disabled = true; });
+      try {
+        if (withScreenshot && !currentScreenshot) {
+          host.style.visibility = "hidden";
+          const dataUrl = await captureScreenshot(currentEl);
+          if (popupHost !== host) return;
+          host.style.visibility = "";
+          if (!dataUrl) {
+            alert("Screenshot failed. Please try again.");
+            return;
+          }
           currentScreenshot = dataUrl;
-          currentScreenshotPath = await saveScreenshotFile(dataUrl);
+          const path = await saveScreenshotFile(dataUrl);
+          if (popupHost !== host) return;
+          currentScreenshotPath = path;
         }
-      }
-      submitAnnotation(el, existing);
-      await copyMarkdown();
-      if (!keepAnnotating) {
-        annotations = [];
-        syncMarkers(); updateBadge(); updateFabBadge();
-        hideToolbar();
+        submitAnnotation(currentEl, annotations.find((a) => a.element === currentEl) || null, false);
+        const copied = await copyMarkdown();
+        if (popupHost !== host || !copied) return;
+        closePopup();
+        if (!keepAnnotating) {
+          annotations = [];
+          syncMarkers(); updateBadge(); updateFabBadge();
+          hideToolbar();
+        }
+      } finally {
+        submitting = false;
+        buttons.forEach((button) => { button.disabled = false; });
       }
     }
 
@@ -658,30 +744,94 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
     q("#copy-ss-next").addEventListener("click", () => submitAndCopy(true, true));
 
     popup.addEventListener("keydown", (e) => {
+      if (e.target === q("#comment") && e.key === "Enter" && (IS_MAC ? e.metaKey : e.ctrlKey) && !e.isComposing && !e.repeat) {
+        e.preventDefault();
+        q("#copy").click();
+      }
       if (e.key === "Escape") { closePopup(); e.stopPropagation(); }
       e.stopPropagation();
     });
 
-    // Position popup near element
-    const rect = el.getBoundingClientRect();
-    let px = rect.right + 12;
-    let py = rect.top;
-    if (px + 540 > window.innerWidth) px = Math.max(8, rect.left - 540);
-    if (py + 420 > window.innerHeight) py = Math.max(8, window.innerHeight - 420);
-    Object.assign(popupHost.style, { position: "fixed", zIndex: Z_POPUP, left: `${px}px`, top: `${py}px` });
+    Object.assign(host.style, { position: "fixed", zIndex: Z_POPUP, left: "0", top: "0", visibility: "hidden" });
+    document.body.appendChild(host);
+    positionPopup(host, popup, currentEl);
+    host.style.visibility = "";
+    const trackHighlight = () => {
+      if (popupHost !== host) return;
+      if (toolbarVisible && host.style.visibility !== "hidden" && document.contains(currentEl)) {
+        showHighlight(currentEl);
+      } else {
+        hideHighlight();
+      }
+      popupHighlightFrame = requestAnimationFrame(trackHighlight);
+    };
+    trackHighlight();
+    setTimeout(() => { if (popupHost === host) q("#comment")?.focus({ preventScroll: true }); }, 50);
+  }
 
-    document.body.appendChild(popupHost);
-    setTimeout(() => q("#comment")?.focus(), 50);
+  function positionPopup(host, popup, el) {
+    const rect = el.getBoundingClientRect();
+    const width = popup.offsetWidth, height = popup.offsetHeight;
+    const margin = 8, gap = 12;
+    const maxX = Math.max(margin, window.innerWidth - width - margin);
+    const maxY = Math.max(margin, window.innerHeight - height - margin);
+    const clampX = (x) => Math.max(margin, Math.min(x, maxX));
+    const clampY = (y) => Math.max(margin, Math.min(y, maxY));
+    const candidates = [
+      { x: rect.right + gap, y: rect.top },
+      { x: rect.left - width - gap, y: rect.top },
+      { x: rect.left, y: rect.bottom + gap },
+      { x: rect.left, y: rect.top - height - gap },
+      { x: margin, y: margin },
+      { x: maxX, y: margin },
+      { x: margin, y: maxY },
+      { x: maxX, y: maxY },
+    ];
+    let best = null;
+    for (const candidate of candidates) {
+      const x = clampX(candidate.x), y = clampY(candidate.y);
+      const overlapWidth = Math.max(0, Math.min(x + width, rect.right) - Math.max(x, rect.left));
+      const overlapHeight = Math.max(0, Math.min(y + height, rect.bottom) - Math.max(y, rect.top));
+      const overlap = overlapWidth * overlapHeight;
+      if (!best || overlap < best.overlap) best = { x, y, overlap };
+      if (overlap === 0) break;
+    }
+    Object.assign(host.style, { left: `${best.x}px`, top: `${best.y}px` });
+  }
+
+  function setupPopupDrag(header, host) {
+    let drag = null;
+    header.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0 || e.target.closest("button")) return;
+      const rect = host.getBoundingClientRect();
+      drag = { id: e.pointerId, x: e.clientX - rect.left, y: e.clientY - rect.top };
+      header.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    header.addEventListener("pointermove", (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const rect = host.getBoundingClientRect();
+      const left = Math.max(0, Math.min(e.clientX - drag.x, window.innerWidth - rect.width));
+      const top = Math.max(0, Math.min(e.clientY - drag.y, window.innerHeight - header.offsetHeight));
+      Object.assign(host.style, { left: `${left}px`, top: `${top}px` });
+    });
+    const stop = () => { drag = null; };
+    header.addEventListener("pointerup", stop);
+    header.addEventListener("pointercancel", stop);
+    header.addEventListener("lostpointercapture", stop);
   }
 
   function closePopup() {
+    if (popupHighlightFrame !== null) cancelAnimationFrame(popupHighlightFrame);
+    popupHighlightFrame = null;
+    hideHighlight();
     popupHost?.remove();
     popupHost = null;
     currentScreenshot = null;
     currentScreenshotPath = null;
   }
 
-  function submitAnnotation(el, existing) {
+  function submitAnnotation(el, existing, dismiss = true) {
     if (!popupHost) return;
     const shadow = popupHost.shadowRoot;
     const comment = shadow.querySelector("#comment").value.trim();
@@ -723,7 +873,7 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
       });
     }
 
-    closePopup();
+    if (dismiss) closePopup();
     syncMarkers();
     updateBadge();
     updateFabBadge();
@@ -849,14 +999,13 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
 
       const cropped = await cropToElement(resp.dataUrl, el);
 
-      if (toolbarHost) toolbarHost.style.display = "";
-      if (markersContainer) markersContainer.style.display = "";
       return cropped;
     } catch (err) {
       console.error("[visual-annotator] Screenshot failed:", err);
-      if (toolbarHost) toolbarHost.style.display = "";
-      if (markersContainer) markersContainer.style.display = "";
       return null;
+    } finally {
+      if (toolbarHost) toolbarHost.style.display = toolbarVisible ? "" : "none";
+      if (markersContainer) markersContainer.style.display = toolbarVisible ? "" : "none";
     }
   }
 
@@ -945,17 +1094,30 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
     const md = exportMarkdown();
     try {
       await navigator.clipboard.writeText(md);
-      lastCopiedMd = md;
     } catch {
       const ta = document.createElement("textarea");
       ta.value = md; ta.style.cssText = "position:fixed;left:-9999px;top:-9999px";
-      document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove();
-      lastCopiedMd = md;
+      let copied = false;
+      try {
+        document.body.appendChild(ta);
+        ta.select();
+        copied = document.execCommand("copy");
+      } catch {
+        copied = false;
+      } finally {
+        ta.remove();
+      }
+      if (!copied) {
+        alert("Copy failed. Your annotations have been kept. Please try again.");
+        return false;
+      }
     }
+    lastCopiedMd = md;
     if (copyBtn) {
       copyBtn.innerHTML = ICONS.check;
       setTimeout(() => { copyBtn.innerHTML = ICONS.copy; }, 1500);
     }
+    return true;
   }
 
   // ─── Clear ───────────────────────────────────────────────────────────
