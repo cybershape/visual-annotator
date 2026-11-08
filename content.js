@@ -48,6 +48,67 @@
   let markersContainer = null;
   let popupHost = null;
   let globalStyleEl = null;
+  let overlayRoot = null;
+  let layerSyncFrame = null;
+  const modalOrder = [];
+
+  function syncOverlayLayer(raise = false) {
+    if (!overlayRoot) return;
+    const modals = Array.from(document.querySelectorAll("dialog:modal"));
+    for (let i = modalOrder.length - 1; i >= 0; i--) {
+      if (!modals.includes(modalOrder[i])) modalOrder.splice(i, 1);
+    }
+    modals.forEach((modal) => {
+      if (!modalOrder.includes(modal)) modalOrder.push(modal);
+    });
+    const parent = modalOrder[modalOrder.length - 1] || document.body;
+    const moved = overlayRoot.parentElement !== parent;
+    if (moved) parent.appendChild(overlayRoot);
+    if (typeof overlayRoot.showPopover === "function") {
+      if (raise && overlayRoot.matches(":popover-open")) overlayRoot.hidePopover();
+      if (!overlayRoot.matches(":popover-open")) overlayRoot.showPopover();
+    }
+    if (moved) {
+      scheduleSyncMarkers();
+      popupHost?.shadowRoot?.querySelector("#comment")?.focus({ preventScroll: true });
+    }
+  }
+
+  function ensureOverlayRoot() {
+    if (!overlayRoot) {
+      overlayRoot = document.createElement("div");
+      overlayRoot.setAttribute("data-va", "overlay");
+      overlayRoot.setAttribute("popover", "manual");
+      overlayRoot.style.cssText = `all:initial !important; position:fixed !important; inset:0 auto auto 0 !important; width:0 !important; height:0 !important; margin:0 !important; padding:0 !important; border:0 !important; overflow:visible !important; pointer-events:none !important; z-index:${Z_POPUP} !important;`;
+    }
+    syncOverlayLayer();
+    return overlayRoot;
+  }
+
+  function onPageLayerChange(e) {
+    if (isOurs(e.target)) return;
+    if (e.target.matches?.("dialog:modal")) {
+      const index = modalOrder.indexOf(e.target);
+      if (index !== -1) modalOrder.splice(index, 1);
+      modalOrder.push(e.target);
+    }
+    if (!overlayRoot?.isConnected || layerSyncFrame !== null) return;
+    layerSyncFrame = requestAnimationFrame(() => {
+      layerSyncFrame = null;
+      if (overlayRoot?.isConnected) syncOverlayLayer(true);
+    });
+  }
+
+  document.addEventListener("beforetoggle", onPageLayerChange, true);
+  document.addEventListener("toggle", onPageLayerChange, true);
+  document.addEventListener("close", onPageLayerChange, true);
+  new MutationObserver((records) => {
+    if (records.some((record) => record.target.matches?.("dialog") ||
+      Array.from(record.removedNodes).some((node) => node.nodeType === 1 &&
+        (node.matches("dialog") || node.querySelector("dialog"))))) {
+      onPageLayerChange({ target: document });
+    }
+  }).observe(document.documentElement, { subtree: true, childList: true, attributes: true, attributeFilter: ["open"] });
 
   const POPUP_CSS = `
 :host {
@@ -166,6 +227,8 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
   });
 
   function startAnnotating() {
+    ensureOverlayRoot();
+
     // Global styles
     if (!globalStyleEl) {
       globalStyleEl = document.createElement("style");
@@ -183,7 +246,7 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
         border: "2px solid rgba(99,102,241,0.7)", background: "rgba(99,102,241,0.08)",
         borderRadius: "3px", transition: "all 0.06s ease", display: "none",
       });
-      document.body.appendChild(highlightEl);
+      overlayRoot.appendChild(highlightEl);
     }
 
     // Tooltip
@@ -196,7 +259,7 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
         borderRadius: "6px", font: "12px ui-monospace, monospace",
         boxShadow: "0 2px 8px rgba(0,0,0,.5)", display: "none", maxWidth: "400px",
       });
-      document.body.appendChild(tooltipEl);
+      overlayRoot.appendChild(tooltipEl);
     }
 
     // Markers
@@ -204,10 +267,10 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
       markersContainer = document.createElement("div");
       markersContainer.setAttribute("data-va", "markers");
       Object.assign(markersContainer.style, {
-        position: "absolute", top: "0", left: "0", width: "0", height: "0",
+        position: "fixed", top: "0", left: "0", width: "0", height: "0",
         overflow: "visible", pointerEvents: "none", zIndex: Z_MARKERS,
       });
-      document.body.appendChild(markersContainer);
+      overlayRoot.appendChild(markersContainer);
     }
 
     if (markersContainer) markersContainer.style.display = "";
@@ -219,6 +282,7 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
     setAnnotating(false);
     if (markersContainer) markersContainer.style.display = "none";
     closePopup();
+    overlayRoot?.remove();
   }
 
   function updateActionState() {
@@ -256,6 +320,7 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
 
   function onMouseMove(e) {
     if (popupHost) return;
+    syncOverlayLayer();
     if (isOurs(e.target)) { hideHighlight(); hideTooltip(); return; }
 
     highlightEl.style.display = "none";
@@ -499,8 +564,9 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
       e.stopPropagation();
     });
 
-    Object.assign(host.style, { position: "fixed", zIndex: Z_POPUP, left: "0", top: "0", visibility: "hidden" });
-    document.body.appendChild(host);
+    Object.assign(host.style, { position: "fixed", pointerEvents: "auto", zIndex: Z_POPUP, left: "0", top: "0", visibility: "hidden" });
+    ensureOverlayRoot().appendChild(host);
+    syncOverlayLayer(true);
     positionPopup(host, popup, currentEl);
     host.style.visibility = "";
     const trackHighlight = () => {
@@ -637,8 +703,8 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
       const marker = document.createElement("div");
       marker.className = `va-marker${a.screenshot ? " has-screenshot" : ""}`;
       marker.textContent = String(i + 1);
-      marker.style.left = `${r.right + window.scrollX - 12}px`;
-      marker.style.top = `${r.top + window.scrollY - 12}px`;
+      marker.style.left = `${r.right - 12}px`;
+      marker.style.top = `${r.top - 12}px`;
       marker.addEventListener("click", (e) => { e.stopPropagation(); showPopup(a.element, a); });
       markersContainer.appendChild(marker);
     });
@@ -828,7 +894,7 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
       if (a.screenshotPath) md += `- **Screenshot:** ![screenshot-${i + 1}](${a.screenshotPath})\n`;
       else if (a.screenshot) md += `- **Screenshot:** [image attached]\n`;
       if (a.comment) md += `- **User Request:** ${a.comment}\n`;
-      md += `\n---\n\n`;
+      if (i < annotations.length - 1) md += `\n---\n\n`;
     });
 
     return md;
@@ -843,7 +909,7 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
       ta.value = md; ta.style.cssText = "position:fixed;left:-9999px;top:-9999px";
       let copied = false;
       try {
-        document.body.appendChild(ta);
+        (popupHost || ensureOverlayRoot()).appendChild(ta);
         ta.select();
         copied = document.execCommand("copy");
       } catch {
