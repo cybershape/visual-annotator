@@ -112,88 +112,117 @@
 
   const POPUP_CSS = `
 :host {
-  all: initial;
-  display: block;
-  position: fixed;
-  z-index: ${Z_POPUP};
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  all:initial; display:block; position:fixed; z-index:${Z_POPUP};
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  --bg:#202124; --bg2:#28292d; --hover:#323338; --border:#3b3d43;
+  --text:#f2f3f5; --muted:#adb0b9; --accent:#818cf8; --accent-h:#6366f1;
+  --focus:rgba(129,140,248,.22); --shadow:0 16px 48px rgba(0,0,0,.32),0 2px 8px rgba(0,0,0,.2);
+  color-scheme:dark;
 }
-* { box-sizing: border-box; }
-
-:host {
-  --bg: #1c1c1e; --bg2: #2c2c2e; --border: #3a3a3c;
-  --text: #f4f4f5; --muted: #a1a1aa;
-  --accent: #6366f1; --accent-h: #4f46e5;
-  --shadow: 0 4px 24px rgba(0,0,0,.5);
-}
-@media (prefers-color-scheme: light) {
+* { box-sizing:border-box; }
+@media (prefers-color-scheme:light) {
   :host {
-    --bg: #ffffff; --bg2: #f8f8f8; --border: #e4e4e7;
-    --text: #18181b; --muted: #71717a;
-    --shadow: 0 4px 24px rgba(0,0,0,.12);
+    --bg:#fff; --bg2:#f7f8fa; --hover:#eef0f4; --border:#e2e4e9;
+    --text:#23252b; --muted:#656b77; --accent:#4f46e5; --accent-h:#4338ca;
+    --focus:rgba(79,70,229,.14); --shadow:0 16px 48px rgba(22,27,45,.12),0 2px 8px rgba(22,27,45,.08);
+    color-scheme:light;
   }
 }
-
 .popup {
-  width: 600px; max-width:calc(100vw - 16px); max-height:calc(100vh - 16px); overflow:auto;
-  background: var(--bg); border: 1px solid var(--border);
-  border-radius: 12px; box-shadow: var(--shadow); padding: 16px;
-  font-size: 13px; color: var(--text);
-  animation: pop .12s ease;
+  width:640px; max-width:calc(100vw - 16px); max-height:calc(100dvh - 16px); overflow:auto;
+  background:var(--bg); border:1px solid var(--border); border-radius:16px;
+  box-shadow:var(--shadow); padding:20px; font-size:14px; line-height:1.5; color:var(--text);
+  scrollbar-width:thin; animation:pop .12s ease-out;
 }
-@keyframes pop {
-  from { opacity:0; transform: scale(.95) translateY(4px); }
-  to   { opacity:1; transform: scale(1) translateY(0); }
+@keyframes pop { from { opacity:0; } to { opacity:1; } }
+button,select,textarea,input { font:inherit; }
+button { transition:background .12s,border-color .12s,box-shadow .12s; }
+button:focus-visible,select:focus-visible,summary:focus-visible,input:focus-visible {
+  outline:2px solid var(--accent); outline-offset:3px;
 }
-
-.header { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; cursor:grab; user-select:none; touch-action:none; }
+button:disabled { opacity:.4; cursor:not-allowed; }
+.header { display:flex; align-items:center; gap:12px; cursor:grab; user-select:none; touch-action:none; }
 .header:active { cursor:grabbing; }
-.parent-row { margin-bottom:10px; }
-.parent-btn {
-  font-size:11px; padding:2px 10px; border-radius:10px;
-  border:1px solid var(--border); background:transparent; color:var(--muted);
-  font-family:inherit; cursor:pointer;
-}
-.parent-btn:hover:not(:disabled) { border-color:var(--accent); color:var(--accent); }
-.parent-btn:disabled { opacity:.4; cursor:default; }
-.parent-row { display:flex; gap:6px; }
 .el-tag {
-  font-size:11px; font-family:ui-monospace,monospace; color:var(--muted);
-  background:var(--bg2); border-radius:4px; padding:2px 8px;
-  max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  min-width:0; max-width:calc(100% - 44px); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  font:500 14px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;
+  color:var(--text); background:var(--bg2); border:1px solid var(--border); border-radius:6px; padding:4px 9px;
 }
 .close-btn {
-  background:none; border:none; color:var(--muted); cursor:pointer;
-  font-size:18px; line-height:1; padding:2px 4px; border-radius: 4px;
+  display:grid; place-items:center; flex:none; margin-left:auto; width:30px; height:30px;
+  background:transparent; border:0; color:var(--muted); cursor:pointer; font-size:18px; line-height:1; border-radius:7px;
 }
-.close-btn:hover { color: #ef4444; background: var(--bg2); }
-
+.close-btn:hover { background:var(--hover); color:var(--text); }
+.parent-row { display:flex; gap:8px; margin-top:12px; }
+.parent-btn {
+  min-height:30px; padding:3px 10px; border-radius:6px; border:1px solid var(--border);
+  background:transparent; color:var(--muted); font-size:14px; cursor:pointer;
+}
+.parent-btn:hover:not(:disabled) { background:var(--hover); color:var(--text); }
+.section-divider { border:0; border-top:1px solid var(--border); margin:16px 0; }
 textarea {
-  width:100%; min-height:80px; resize:vertical;
-  border:1px solid var(--border); border-radius:8px;
-  background:var(--bg2); color:var(--text);
-  font-family:inherit; font-size:13px; padding:10px 12px;
-  outline:none; transition:border-color .15s; margin-bottom:10px;
+  display:block; width:100%; min-height:160px; resize:vertical; padding:12px 14px;
+  border:1px solid var(--border); border-radius:10px; background:var(--bg2); color:var(--text);
+  font-size:14px; line-height:1.65; outline:none; transition:border-color .12s,box-shadow .12s;
 }
-textarea:focus { border-color:var(--accent); }
+textarea:focus { border-color:var(--accent); box-shadow:0 0 0 3px var(--focus); }
 textarea::placeholder { color:var(--muted); }
-
-.actions { display:flex; justify-content:flex-end; gap:6px; flex-wrap:wrap; }
-
-.btn-secondary {
-  padding:7px 12px; border-radius:6px; border:1px solid var(--border);
-  background:transparent; color:var(--muted); font-size:12px;
-  font-family:inherit; cursor:pointer; white-space:nowrap;
+input[type=checkbox] { width:16px; height:16px; margin:0; accent-color:var(--accent); cursor:pointer; flex:none; }
+#herdr-panel { margin:0 !important; }
+#herdr-panel > summary { display:flex; align-items:center; gap:8px; min-height:28px; list-style:none; color:var(--text) !important; }
+#herdr-panel > summary::-webkit-details-marker { display:none; }
+#herdr-panel > summary > span { font-weight:600; }
+#herdr-panel > summary > label { color:var(--muted); font-weight:400; }
+.herdr-chevron { flex:none; color:var(--muted); transition:transform .15s; }
+#herdr-panel[open] .herdr-chevron { transform:rotate(90deg); }
+.herdr-target-row { display:flex; align-items:center; gap:8px; margin-top:12px; }
+#herdr-agent { appearance:none; font-size:14px; line-height:1.5; height:38px; min-height:38px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#herdr-agent selectedcontent { display:block; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#herdr-agent option { font-size:14px; padding:10px 12px; overflow-wrap:anywhere; }
+#herdr-agent option:checked { font-weight:600; }
+#herdr-agent option:hover { background:var(--hover); }
+#herdr-status:empty { display:none; }
+#herdr-status { padding:10px 12px; border-radius:8px; background:var(--bg2); border:1px solid var(--border); }
+@supports (appearance:base-select) {
+  #herdr-agent,#herdr-agent::picker(select) { appearance:base-select; }
+  #herdr-agent::picker-icon { display:none; }
+  #herdr-agent::picker(select) {
+    font-family:inherit; font-size:14px; color:var(--text); background:var(--bg);
+    border:1px solid var(--border); border-radius:10px; box-shadow:var(--shadow); padding:4px;
+    margin:6px 0; max-height:280px; max-width:calc(100vw - 24px); overflow:auto;
+    position-area:block-end span-inline-end; position-try-fallbacks:flip-block;
+  }
 }
-.btn-secondary:hover { border-color:var(--muted); color:var(--text); }
-
-.btn-primary {
-  padding:7px 16px; border-radius:6px; border:none;
-  background:var(--accent); color:#fff;
-  font-size:12px; font-weight:600; font-family:inherit; cursor:pointer;
+.actions { display:flex; align-items:center; gap:10px; }
+.action-groups { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:10px; margin-left:auto; }
+.action-group { display:flex; align-items:stretch; }
+.action-group > button { border-radius:0; }
+.action-group > button:first-child { border-radius:8px 0 0 8px; padding:9px 10px; border-right:0; }
+.action-group > button:last-child { border-radius:0 8px 8px 0; }
+.action-group > button + button { border-left:1px solid var(--border); }
+.btn-secondary,.btn-primary {
+  display:inline-flex; align-items:center; justify-content:center; gap:6px; min-height:38px;
+  padding:8px 12px; border-radius:8px; border:1px solid var(--border); font-size:14px; cursor:pointer; white-space:nowrap;
 }
-.btn-primary:hover { background:var(--accent-h); }
-.btn-primary:disabled { opacity:.5; cursor:not-allowed; }
+.btn-secondary { background:var(--bg); color:var(--text); }
+.btn-secondary:hover:not(:disabled) { background:var(--hover); }
+.btn-primary { background:var(--accent-h); border-color:var(--accent-h); color:#fff; font-weight:500; }
+.btn-primary:hover:not(:disabled) { filter:brightness(1.1); }
+.action-group-exit > button + button { border-left-color:rgba(255,255,255,.24); }
+#cancel { color:var(--muted); background:transparent; border-color:transparent; padding-left:0; }
+#cancel:hover { color:var(--text); }
+@media (max-width:480px) {
+  .popup { padding:16px; border-radius:12px; }
+  .actions { align-items:flex-start; }
+  .action-groups { gap:8px; }
+  .action-group { flex:1; justify-content:flex-end; }
+  .action-group > button:last-child { flex:1; }
+  #herdr-panel > summary { flex-wrap:wrap; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .popup { animation:none; }
+  *,*::before,*::after { transition:none !important; }
+}
   `;
 
   const GLOBAL_CSS = `
@@ -452,26 +481,49 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
 
     const popup = document.createElement("div");
     popup.className = "popup";
+    popup.setAttribute("role", "dialog");
+    popup.setAttribute("aria-label", "Annotate element");
     popup.innerHTML = `
       <div class="header">
         <span class="el-tag">${esc(elLabel(currentEl))}</span>
-        <button class="close-btn" id="close">×</button>
+        <button class="close-btn" id="close" aria-label="Close annotation">×</button>
       </div>
       <div class="parent-row"><button class="parent-btn" id="parent">Parent ↑</button><button class="parent-btn" id="previous">Previous ←</button></div>
-      <textarea id="comment" placeholder="Describe the issue or desired change...">${esc(comment)}</textarea>
+      <hr class="section-divider">
+      <textarea id="comment" aria-label="Annotation comment" placeholder="Describe the issue or desired change...">${esc(comment)}</textarea>
+      <hr class="section-divider">
       ${clipboardHasLastCopy ? `
       <div style="margin-bottom:10px;">
-        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer;">
+        <label style="display:flex;align-items:center;gap:6px;font-size:14px;color:var(--muted);cursor:pointer;">
           <input type="checkbox" id="append-existing" checked style="accent-color:var(--accent);">
           Add to existing annotations
         </label>
       </div>` : ""}
+      <details id="herdr-panel" style="margin-bottom:12px;">
+        <summary style="cursor:pointer;color:var(--muted);">
+          <svg class="herdr-chevron" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
+          <span>Herdr Agents</span>
+          <label style="margin-left:auto;display:inline-flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" id="herdr-enabled"> Send to Herdr</label>
+        </summary>
+        <div class="herdr-target-row">
+          <select id="herdr-agent" aria-label="Herdr agent" style="flex:1;min-width:0;background:var(--bg2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:7px 32px 7px 10px;background-image:url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 viewBox=%220 0 12 12%22%3E%3Cpath d=%22m3 4.5 3 3 3-3%22 fill=%22none%22 stroke=%22%23888888%22 stroke-width=%221.5%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E');background-repeat:no-repeat;background-position:right 10px center;"><option value="">Select an agent</option></select>
+          <button class="btn-secondary" id="herdr-refresh">Refresh</button>
+        </div>
+        <div id="herdr-status" role="status" style="margin-top:8px;color:var(--muted);white-space:pre-wrap;overflow-wrap:anywhere;"></div>
+      </details>
+      <hr class="section-divider">
       <div class="actions">
         <button class="btn-secondary" id="cancel">Cancel</button>
-        <button class="btn-secondary" id="copy-ss-next" style="display:flex;align-items:center;gap:5px;">${ICONS.camera}Copy & Next</button>
-        <button class="btn-secondary" id="copy-next">Copy & Next</button>
-        <button class="btn-secondary" id="copy-ss" style="display:flex;align-items:center;gap:5px;">${ICONS.camera}Copy & Exit</button>
-        <button class="btn-primary" id="copy">Copy & Exit</button>
+        <div class="action-groups">
+          <div class="action-group">
+            <button class="btn-secondary" id="copy-ss-next" aria-label="Copy with screenshot and continue" title="Copy with screenshot & Next">${ICONS.camera}</button>
+            <button class="btn-secondary" id="copy-next">Copy & Next</button>
+          </div>
+          <div class="action-group action-group-exit">
+            <button class="btn-primary" id="copy-ss" aria-label="Copy with screenshot and exit" title="Copy with screenshot & Exit">${ICONS.camera}</button>
+            <button class="btn-primary" id="copy">Copy & Exit</button>
+          </div>
+        </div>
       </div>
     `;
     shadow.appendChild(popup);
@@ -512,6 +564,142 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
     refreshTarget();
 
     let submitting = false;
+    let herdrLoaded = false;
+    let herdrLoading = false;
+    let sendUnknown = false;
+    let herdrDefaultApplied = false;
+    const uploadedScreenshots = new Map();
+
+    async function herdrRequest(operation, args = {}) {
+      let response;
+      try {
+        response = await chrome.runtime.sendMessage({ type: "HERDR_REQUEST", operation, ...args });
+      } catch (error) {
+        throw Object.assign(error, { code: operation === "sendAnnotation" ? "SEND_UNKNOWN" : "BRIDGE_UNAVAILABLE" });
+      }
+      if (!response || response.error) {
+        const error = response?.error || { code: operation === "sendAnnotation" ? "SEND_UNKNOWN" : "BRIDGE_UNAVAILABLE", message: "Herdr bridge did not respond." };
+        throw Object.assign(new Error(error.message), { code: error.code });
+      }
+      return response.result;
+    }
+
+    function updateExitActions() {
+      const send = q("#herdr-enabled").checked;
+      const label = send ? "Send & Exit" : "Copy & Exit";
+      q("#copy").textContent = label;
+      q("#copy-ss").setAttribute("aria-label", `${send ? "Send to Herdr" : "Copy"} with screenshot and exit`);
+      q("#copy-ss").title = `${send ? "Send" : "Copy"} with screenshot & Exit`;
+      const disabled = submitting || (send && (herdrLoading || sendUnknown || !q("#herdr-agent").value));
+      q("#copy").disabled = disabled;
+      q("#copy-ss").disabled = disabled;
+    }
+
+    q("#herdr-enabled").closest("label").addEventListener("click", (e) => e.stopPropagation());
+    q("#herdr-enabled").addEventListener("change", updateExitActions);
+
+    async function loadHerdrAgents() {
+      if (herdrLoading || submitting) return;
+      herdrLoading = true;
+      updateExitActions();
+      q("#herdr-refresh").disabled = true;
+      q("#herdr-status").textContent = "Connecting to Herdr…";
+      try {
+        const previous = q("#herdr-agent").value;
+        const { agents, selected } = await herdrRequest("listAgents");
+        if (popupHost !== host) return;
+        q("#herdr-agent").replaceChildren(new Option("Select an agent", ""));
+        agents.forEach((agent) => {
+          const label = [agent.machine || "local", agent.space, agent.tab, agent.app, agent.cwd, agent.status, agent.address].filter(Boolean).join(" · ");
+          const option = new Option(label, agent.address);
+          option.disabled = agent.status === "blocked";
+          q("#herdr-agent").appendChild(option);
+        });
+        const preferred = previous || selected;
+        if (agents.some((agent) => agent.address === preferred && agent.status !== "blocked")) q("#herdr-agent").value = preferred;
+        herdrLoaded = true;
+        if (!herdrDefaultApplied && agents.length) {
+          herdrDefaultApplied = true;
+          q("#herdr-panel").open = true;
+          q("#herdr-enabled").checked = true;
+        }
+        q("#herdr-status").textContent = agents.length ? "" : "No live agents found in Herdr. Open an agent and refresh.";
+      } catch (error) {
+        q("#herdr-status").textContent = `${error.message}\nInstall the Native Messaging bridge using native/install.cjs and this extension's ID, then refresh.`;
+      } finally {
+        herdrLoading = false;
+        q("#herdr-refresh").disabled = false;
+        updateExitActions();
+        if (popupHost === host) positionPopup(host, popup, currentEl);
+      }
+    }
+
+    q("#herdr-panel").addEventListener("toggle", () => {
+      if (q("#herdr-panel").open && !herdrLoaded) loadHerdrAgents();
+      positionPopup(host, popup, currentEl);
+    });
+    q("#herdr-refresh").addEventListener("click", loadHerdrAgents);
+    q("#herdr-agent").addEventListener("change", () => {
+      updateExitActions();
+    });
+    async function submitToHerdr(withScreenshot, keepAnnotating) {
+      if (submitting || sendUnknown || !q("#herdr-agent").value) return;
+      submitting = true;
+      const terminal = q("#herdr-agent").value;
+      const controls = Array.from(popup.querySelectorAll("button, select, input, textarea"));
+      const disabled = controls.map((control) => control.disabled);
+      controls.forEach((control) => { control.disabled = true; });
+      try {
+        if (withScreenshot && !currentScreenshot) {
+          q("#herdr-status").textContent = "Capturing screenshot…";
+          host.style.visibility = "hidden";
+          try { currentScreenshot = await captureScreenshot(currentEl); }
+          finally { host.style.visibility = ""; }
+          if (popupHost !== host) return;
+          if (!currentScreenshot) throw new Error("Screenshot failed. Please try again.");
+        }
+        submitAnnotation(currentEl, annotations.find((a) => a.element === currentEl) || null, false);
+        const batch = annotations.map((annotation) => ({ ...annotation }));
+        const paths = new Map();
+        for (const annotation of batch) {
+          if (!annotation.screenshot) continue;
+          if ((annotation.screenshot.length - "data:image/png;base64,".length) * 3 / 4 > 8 * 1024 * 1024 + 2) {
+            throw new Error("A screenshot exceeds 8 MB. Use Copy or capture a smaller element.");
+          }
+          q("#herdr-status").textContent = `Uploading screenshot for annotation ${annotation.id}…`;
+          const cacheKey = `${terminal}:${annotation.id}`;
+          let uploaded = uploadedScreenshots.get(cacheKey);
+          if (!uploaded || uploaded.dataUrl !== annotation.screenshot) {
+            const result = await herdrRequest("uploadAttachment", { terminal, attachmentId: Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, "0")).join(""), dataUrl: annotation.screenshot });
+            uploaded = { dataUrl: annotation.screenshot, path: result.path };
+            uploadedScreenshots.set(cacheKey, uploaded);
+          }
+          paths.set(annotation.id, uploaded.path);
+          if (popupHost !== host) return;
+        }
+        q("#herdr-status").textContent = `Submitting to ${terminal}…`;
+        await herdrRequest("sendAnnotation", { terminal, markdown: exportMarkdown(batch, paths) });
+        if (popupHost !== host) return;
+        closePopup();
+        if (!keepAnnotating) {
+          annotations = [];
+          syncMarkers(); updateActionState();
+          stopAnnotating();
+        }
+      } catch (error) {
+        if (error.code === "SEND_UNKNOWN") {
+          sendUnknown = true;
+          q("#herdr-status").textContent = "Send result unknown. Check the selected agent before sending again. Annotations have been kept.";
+        } else {
+          q("#herdr-status").textContent = `${error.message}\nAnnotations have been kept. You can retry or use Copy.`;
+        }
+      } finally {
+        submitting = false;
+        controls.forEach((control, i) => { control.disabled = disabled[i]; });
+        updateExitActions();
+      }
+    }
+
     async function submitAndCopy(withScreenshot, keepAnnotating) {
       if (submitting || popupHost !== host) return;
       submitting = true;
@@ -550,8 +738,8 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
     // Wire events
     q("#close").addEventListener("click", closePopup);
     q("#cancel").addEventListener("click", closePopup);
-    q("#copy").addEventListener("click", () => submitAndCopy(false, false));
-    q("#copy-ss").addEventListener("click", () => submitAndCopy(true, false));
+    q("#copy").addEventListener("click", () => q("#herdr-enabled").checked ? submitToHerdr(false, false) : submitAndCopy(false, false));
+    q("#copy-ss").addEventListener("click", () => q("#herdr-enabled").checked ? submitToHerdr(true, false) : submitAndCopy(true, false));
     q("#copy-next").addEventListener("click", () => submitAndCopy(false, true));
     q("#copy-ss-next").addEventListener("click", () => submitAndCopy(true, true));
 
@@ -569,6 +757,7 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
     syncOverlayLayer(true);
     positionPopup(host, popup, currentEl);
     host.style.visibility = "";
+    loadHerdrAgents();
     const trackHighlight = () => {
       if (popupHost !== host) return;
       if (isAnnotating && host.style.visibility !== "hidden" && document.contains(currentEl)) {
@@ -865,7 +1054,7 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
 
   // ─── Copy Markdown ──────────────────────────────────────────────────
 
-  function exportMarkdown() {
+  function exportMarkdown(batch = annotations, screenshotPaths = null) {
     const url = window.location.href;
     const vw = window.innerWidth, vh = window.innerHeight;
     const now = new Date().toISOString();
@@ -875,12 +1064,12 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
     md += `**Viewport:** ${vw}×${vh}\n`;
     md += `**Date:** ${now}\n\n`;
 
-    if (!annotations.length) { md += "*No annotations*\n"; return md; }
+    if (!batch.length) { md += "*No annotations*\n"; return md; }
 
     md += `---\n\n`;
 
-    const single = annotations.length === 1;
-    annotations.forEach((a, i) => {
+    const single = batch.length === 1;
+    batch.forEach((a, i) => {
       const label = a.idAttr ? `#${a.idAttr}` : `${a.tag}${a.classes[0] ? "." + a.classes[0] : ""}`;
       if (!single) md += `## ${i + 1}. \`${label}\`\n\n`;
       if (a.shopifySection?.file) md += `- **Shopify Section:** \`${a.shopifySection.file}\`\n`;
@@ -891,10 +1080,11 @@ body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
       if (a.keyStyles && Object.keys(a.keyStyles).length) {
         md += `- **Styles:** ${Object.entries(a.keyStyles).map(([k, v]) => `${k}: ${v}`).join(", ")}\n`;
       }
-      if (a.screenshotPath) md += `- **Screenshot:** ![screenshot-${i + 1}](${a.screenshotPath})\n`;
+      const screenshotPath = screenshotPaths ? screenshotPaths.get(a.id) : a.screenshotPath;
+      if (screenshotPath) md += `- **Screenshot:** ![screenshot-${i + 1}](${screenshotPath.replace(/ /g, "%20").replace(/\(/g, "%28").replace(/\)/g, "%29")})\n`;
       else if (a.screenshot) md += `- **Screenshot:** [image attached]\n`;
       if (a.comment) md += `- **User Request:** ${a.comment}\n`;
-      if (i < annotations.length - 1) md += `\n---\n\n`;
+      if (i < batch.length - 1) md += `\n---\n\n`;
     });
 
     return md;

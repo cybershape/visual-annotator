@@ -1,204 +1,226 @@
 # Visual Annotator
 
-Chrome extension to annotate any web page and copy structured markdown — built for AI coding agents.
+A Chromium extension for annotating web page elements and sharing structured feedback with AI coding agents. Copy Markdown into your preferred tool, or submit annotations directly to an existing agent in Herdr.
 
-Annotate elements, capture screenshots, copy browser console logs, and paste everything into your agent of choice. The output is optimized for AI consumption: structured markdown with selectors, bounding boxes, computed styles, and file paths to screenshots.
+Select an element, describe the change, and optionally capture a screenshot. Feedback includes a CSS selector, text, page URL, bounding box, selected computed styles, and screenshot paths when available. No build step or hosted backend is required.
 
-**One-click console capture** — all `console.log`, `console.warn`, `console.error`, and unhandled exceptions are recorded in the background. Click the terminal icon in the toolbar to copy them as formatted markdown. A red dot on the icon alerts you when errors have occurred.
+## Features
 
-### Works with
+- Select elements with a hover highlight and a tooltip showing their tag, classes, and dimensions.
+- Use Alt/Option + scroll to move through ancestors, or use **Parent ↑** and **Previous ←** in the annotation popup.
+- Annotate elements in native modal dialogs and popovers. The annotation UI uses the browser's top layer and follows modal dialog changes.
+- Drag the popup by its header; its initial position tries to avoid covering the selected element.
+- Collect multiple annotations in a batch and reopen them through numbered page markers.
+- Copy the batch as Markdown, with optional screenshots cropped around the selected element.
+- On macOS, send the batch directly to a selected local or remote Herdr agent, including screenshots transferred to that agent's machine.
 
-**Markdown + Screenshots** — agents with local file system access can read the saved screenshot files directly:
-
-| Agent | How |
-|-------|-----|
-| **[Claude Code CLI](https://code.claude.com/docs/en/quickstart)** | Paste markdown + screenshot paths into the CLI prompt |
-| **[Claude Code VS Code](https://marketplace.visualstudio.com/items?itemName=anthropic.claude-code)** | Paste into Claude Code chat panel |
-| **[Cursor](https://cursor.com)** | Paste into chat or Cmd+K inline edit |
-| **[Windsurf](https://windsurf.com)** | Paste into Cascade chat |
-| **[Cline](https://cline.bot)** | Paste into chat panel in VS Code |
-| **[Aider](https://github.com/Aider-AI/aider)** | Paste into CLI prompt |
-| **[GitHub Copilot](https://github.com/features/copilot)** | Paste into Copilot Chat in VS Code |
-| **[Pi](https://github.com/badlogic/pi-mono)** | Paste into CLI prompt |
-| **[OpenCode](https://github.com/anomalyco/opencode)** | Paste into CLI prompt |
-| **[Gemini CLI](https://geminicli.com)** | Paste into CLI prompt |
-| **[Google Antigravity](https://antigravity.google)** | Paste into conversation |
-
-**Markdown only** — web-based agents without file system access get the full structured markdown (selectors, styles, bounding boxes), but cannot load the screenshot files:
-
-| Agent | How |
-|-------|-----|
-| **ChatGPT** | Paste into conversation |
-| **[Gemini](https://gemini.google.com)** | Paste into conversation |
-| Any other agent | If it reads markdown, it works |
-
-No backend. No framework dependency. Works on every website.
+Start selection from the pinned extension icon or its keyboard shortcut. Annotation controls appear after selecting an element.
 
 ## Demo
 
 https://github.com/user-attachments/assets/c954c6cb-d978-4980-a194-51a8702903c3
 
-## Install
+The video may show an older interface; the controls described below reflect the current implementation.
 
-### Mac
+## Install the extension
 
-1. Download or clone this repository
-2. Open Chrome and go to `chrome://extensions`
-3. Enable **Developer mode** (toggle in the top right corner)
-4. Click **Load unpacked**
-5. In the file dialog, navigate to the downloaded `visual-annotator` folder and select it
-6. The extension icon appears in your toolbar — click the puzzle piece icon and pin **Visual Annotator** for quick access
+Use a Chromium-based browser such as Helium, Chrome, Edge, or Chromium. The extension can be loaded unpacked on macOS, Windows, or Linux; the optional Herdr bridge installer currently supports macOS only.
 
-### Windows
+1. Download or clone this repository and keep it in a stable location.
+2. Open your browser's extension management page, such as `chrome://extensions` in Chrome or Helium, or `edge://extensions` in Edge.
+3. Enable **Developer mode** and choose **Load unpacked**.
+4. Select this repository's directory, which contains `manifest.json`.
+5. Pin **Visual Annotator** to the browser toolbar for quick access.
 
-1. Download or clone this repository
-2. Open Chrome and type `chrome://extensions` in the address bar
-3. Enable **Developer mode** (toggle in the top right corner)
-4. Click **Load unpacked**
-5. Browse to the downloaded `visual-annotator` folder and select it
-6. The extension icon appears in your toolbar — click the puzzle piece icon and pin **Visual Annotator** for quick access
+The browser restricts extensions on internal pages, extension stores, and some protected documents. Use a normal web page. For local `file://` pages, enable **Allow access to file URLs** in the extension's details if your browser provides that setting.
 
 ### Updating
 
-To update after pulling new changes:
+After pulling changes, reload Visual Annotator from the browser's extension management page, then refresh the web pages you want to annotate. Existing page annotations are held in memory and are lost when a page reloads.
 
-1. Go to `chrome://extensions`
-2. Find **Visual Annotator** and click the reload icon (circular arrow)
+If the repository, Node installation, or Herdr executable paths move, rerun the bridge installer. If the unpacked extension ID changes, uninstall the old bridge registration with its old ID before registering the new one.
 
-## Usage
+## Annotate and copy
 
-1. **Start selecting** — Click the extension icon or press `Cmd+Shift+.` (Mac) / `Ctrl+Shift+.` (Windows/Linux), then click an element on the page
-2. **Comment** — Optionally describe the issue or desired change in the annotation popup
-3. **Copy & Exit** — Copy the current batch as markdown, clear its page markers, and exit selection mode; use the camera version to include a screenshot
-4. **Copy & Next** — Copy the current batch and continue selecting elements; numbered markers let you edit annotations already in the batch
-5. **Start a new batch** — After Copy & Next, uncheck **Add to existing annotations** in the next popup to replace the batch, when this option is available
-6. **Paste** — Into any AI agent prompt
-7. **Exit selecting** — Click the extension icon again, use the shortcut, or press `Escape` when no annotation popup is open
+1. Click the extension icon or press `Cmd+Shift+.` on macOS / `Ctrl+Shift+.` on Windows or Linux to start selection.
+2. Hover over an element to inspect it. Hold Alt/Option while scrolling to cycle through its ancestors.
+3. Click to open the annotation popup and enter a comment. **Parent ↑** selects the parent; **Previous ←** returns to the previous target. Switching targets clears the current screenshot so it can be captured for the new element.
+4. Choose an action:
 
-## Extension Icon
+   | Action | Result |
+   |--------|--------|
+   | **Copy & Next** | Copy the current batch and continue selecting; keep the batch and its markers |
+   | Camera **Copy & Next** | Capture the current element if needed, then copy and continue |
+   | **Copy & Exit** | Copy the batch, clear its markers, and exit selection |
+   | Camera **Copy & Exit** | Capture the current element if needed, then copy and exit |
+   | **Cancel** or **×** | Close the popup without submitting the current edits |
 
-The browser extension icon is the entry point; no floating toolbar is added to the page. Pin the extension for quick access.
+5. Paste the Markdown into your agent or editor. Agents with access to the saved screenshot files can open those paths. Web chat tools generally need images attached separately.
+
+Click a numbered marker to edit an annotation already in the batch. When the clipboard still contains the last export and annotations are retained, the next popup offers **Add to existing annotations**. Uncheck it to replace the batch on the next copy or send. This option depends on the browser allowing the clipboard read.
+
+Press Escape to close the popup, then again to exit selection. Toggling selection off retains the submitted batch in memory and hides its markers; toggling it on restores them. Successful **Copy & Exit** or **Send & Exit** clears the batch. Reloading or leaving the page discards it.
+
+### Extension badge
 
 | Badge | Meaning |
 |-------|---------|
-| Purple `ON` | Selection mode is active with no annotations |
-| Purple number | Selection mode is active; the number is the annotation count |
-| Gray number | Selection mode is off; the current batch is retained |
-| No badge | Selection mode is off with no annotations |
+| Purple `ON` | Selection is active, with no submitted annotations |
+| Purple number | Selection is active; the number is the batch size |
+| Gray number | Selection is off; the batch is retained |
+| No badge | Selection is off, with no submitted annotations |
 
-Hover over the extension icon to see its current state. Badge state is specific to each tab and resets when the page reloads.
+The badge is specific to each browser tab. Hover over the icon for its current state.
 
-## Element Picker
-
-When annotation mode is active:
-
-- **Hover** elements to see a highlight and tooltip with tag, classes, dimensions
-- **Alt/Option + Scroll** to cycle through parent elements
-- **Click** to select an element and open the comment popup
-- **Click a numbered marker** to edit an existing annotation
-- **Escape** to exit annotation mode
-
-## Copy Intent
-
-The **Copy** intent lets you grab the full HTML DOM of any element on the page. This is useful when you want an AI agent to understand the exact markup structure — for example to replicate a component, refactor HTML, or debug rendering issues.
-
-When you select "Copy" as the intent, a checkbox appears: **Include full HTML DOM of element** (checked by default). The complete `outerHTML` of the selected element is then included in the markdown output as a fenced code block.
-
-```markdown
-## 1. `div.card` [copy · important]
-
-- **Comment:** Replicate this card component
-- **HTML:**
-```html
-<div class="card">
-  <h2>Title</h2>
-  <p>Content with <a href="#">links</a></p>
-</div>
-```
-
----
-```
-
-## Markdown Output
-
-The copy button generates markdown like this:
-
-```markdown
-# Visual Feedback — My App
-**URL:** https://myapp.com/dashboard
-**Viewport:** 1440x900
-**Date:** 2025-01-15T10:30:00.000Z
-
----
-
-## 1. `button.btn-primary` [fix · important]
-
-- **Comment:** The button should use the design system blue (#3B82F6), not green.
-- **URL:** https://myapp.com/dashboard
-- **Element:** `<button class="btn-primary">`
-- **Selector:** `main > div > button.btn-primary`
-- **Text:** "Submit Form"
-- **Bounding Box:** 120x40 at (350, 680)
-- **Styles:** display: flex, backgroundColor: rgb(34, 197, 94)
-- **Screenshot:** ![screenshot-1](/Users/.../Downloads/visual-annotator/myapp-com-dashboard-1743564000000.png)
-
----
-```
-
-## Console Output
-
-The console button generates markdown like this:
-
-```markdown
-# Console Output — My App
-**URL:** https://myapp.com/dashboard
-**Messages:** 12 (2 errors, 1 warnings)
-
----
-
-[ERROR] 10:30:15.123
-Uncaught TypeError: Cannot read property 'foo' of undefined
-
-[WARN] 10:30:16.456
-Deprecation warning: componentWillMount has been renamed
-
-[LOG] 10:30:17.789
-App initialized
-```
-
-## Keyboard Shortcuts
-
-The extension shortcut toggles selection mode. Popup shortcuts work while annotating.
+### Keyboard and mouse shortcuts
 
 | Shortcut | Action |
 |----------|--------|
-| `Cmd/Ctrl+Shift+.` | Start or exit element selection |
-| `Cmd/Ctrl+Enter` | Copy and finish from the comment field |
-| `Escape` | Close the popup first; press again to exit selection |
+| `Cmd/Ctrl+Shift+.` | Toggle element selection |
+| Alt/Option + scroll | Cycle through the hovered element's ancestors |
+| `Cmd/Ctrl+Enter` in the comment field | Run **Send & Exit** when **Send to Herdr** is checked; otherwise **Copy & Exit**, without taking a new screenshot |
+| Escape | Close the popup first; otherwise exit selection |
+| Drag popup header | Move the annotation popup |
 
-> **Tip:** By default the shortcut only works when Chrome is focused. To make it work globally (from any app), go to `chrome://extensions/shortcuts`, find **Visual Annotator** and change the scope from "In Chrome" to "Global".
+Browser shortcuts can be reassigned from the browser's extension shortcut settings. The comment-field shortcut follows the current exit action.
+
+## Send directly to Herdr
+
+This optional integration submits the batch to an existing agent and presses Enter. It uses a local Native Messaging bridge, not the clipboard or whichever terminal happens to have focus. It does not create agents or change Herdr layouts.
+
+### Set up the macOS bridge
+
+Requires Node.js 18 or newer, `herdr-app`, and `hc` on your shell's `PATH`. The integration was developed against herdr-app 0.1.13 and hc 0.1.18, with `terminal.put` and `terminal.send` support. There are no npm dependencies to install.
+
+1. Load the extension in your chosen browser and copy its actual **ID** from the extension management page.
+2. From this repository, register that browser's bridge. For Helium:
+
+   ```sh
+   node native/install.cjs --browser helium --extension-id YOUR_EXTENSION_ID
+   ```
+
+3. Reload the extension and refresh the web page. A browser restart is normally unnecessary; if the host is still not found, fully quit and reopen the browser.
+4. Keep Herdr running with an existing agent, open an annotation, and expand **Herdr Agents**.
+
+Choose the browser explicitly with `--browser`:
+
+| Value | macOS registration directory under `~/Library/Application Support/` |
+|-------|------------------------------------------------------------------|
+| `helium` | `net.imput.helium/NativeMessagingHosts/` |
+| `chrome` (default) | `Google/Chrome/NativeMessagingHosts/` |
+| `edge` | `Microsoft Edge/NativeMessagingHosts/` |
+| `chromium` | `Chromium/NativeMessagingHosts/` |
+
+The installer registers `com.visual_annotator.herdr` for exactly the supplied extension ID and records absolute Node, hc, and herdr-app paths. Each browser has its own launcher and configuration under `~/Library/Application Support/com.visual_annotator.herdr/<browser>/`. Installing or uninstalling one browser leaves the others in place. No administrator privileges or background HTTP service are required.
+
+The browser launches the bridge on demand. The extension disconnects an idle connection after one minute. Keep the repository in place because the launcher references its `native/host.cjs`.
+
+To uninstall, use the same browser and extension ID used for installation:
+
+```sh
+node native/install.cjs --browser helium --extension-id YOUR_EXTENSION_ID --uninstall
+```
+
+### Select an agent and send
+
+1. Each annotation popup checks for Herdr agents. When agents are found, **Herdr Agents** expands and its **Send to Herdr** checkbox is selected by default. Without agents or a connected bridge, the popup keeps Copy mode. Use **Refresh** to update the list.
+2. Choose a target. Entries show the machine, space, tab, agent program, working directory, status, and terminal address where available. The agent currently displayed in Herdr is selected by default when available. The last successfully used target is remembered as a fallback; refreshing preserves a target you already selected in the popup.
+3. The **Send to Herdr** checkbox sits at the right of the **Herdr Agents** header. While **Send to Herdr** is checked, the two **Copy & Exit** buttons become **Send & Exit**: the camera version captures the current element if needed; the plain version does not take a new screenshot. Both send the batch and exit selection. Uncheck the checkbox to restore Copy. **Copy & Next** continues to copy. Screenshots already in the batch are included with either send button. Attachments upload first, then the batch is submitted once to the selected agent.
+
+The list includes live agents associated with the connected Herdr window, including remote agents. Plain shells and exited terminals are excluded. Blocked agents cannot be selected, and the bridge checks the target again before upload and submission. It does not force input into a blocked agent or interrupt a working one.
+
+For remote agents, screenshots are uploaded through herdr-core and the Markdown references paths on the target machine. Each image is limited to 8 MiB of decoded data. Uploaded files have the target terminal's lifetime; they are not permanent screenshot storage.
+
+A successful response means the content was submitted to the terminal, not that the agent completed the task. A successful send clears the batch and exits selection.
+
+### Connection and failure handling
+
+- **Host not found or access denied:** check the browser parameter and its extension ID, then rerun the installer. Registrations are browser-specific.
+- **Missing dependency:** make Node, hc, and herdr-app available on `PATH` when running the installer; it does not install them for you.
+- **Empty agent list:** open an agent in Herdr and refresh. The bridge uses its inherited/default Herdr window and core session context; there is no window or session picker.
+- **Target disappeared, blocked, or remote machine unavailable:** refresh the list or resolve the target's state, then retry.
+- **Screenshot upload or submission failed:** comments, annotations, and screenshots remain available for retry or Copy.
+- **Send result unknown:** inspect the selected agent before manually sending again. The current popup disables another Herdr send, and no submission is automatically retried. Request deduplication is limited to the current bridge process and does not guarantee exactly-once delivery across restarts.
+
+## Markdown output
+
+Both delivery methods use the same structured format. A single annotation omits a numbered heading; multiple annotations receive numbered headings. The output includes page title, URL, viewport and export time, followed by CSS selector, text, document coordinates, selected computed styles, optional screenshot path and user request. Shopify section metadata is included when detected.
+
+Example for a single annotation:
+
+```markdown
+# Visual Feedback — My App
+**URL:** http://localhost:3000/dashboard
+**Viewport:** 1440×900
+**Date:** 2026-11-08T10:30:00.000Z
+
+---
+
+- **Selector:** `#submit`
+- **Text:** "Submit"
+- **Bounding Box:** 120×40 at (350, 680)
+- **Styles:** display: flex, backgroundColor: rgb(34, 197, 94)
+- **Screenshot:** ![screenshot-1](/path/to/screenshot.png)
+- **User Request:** Use the design system blue for this button.
+```
+
+Screenshot paths in Copy exports refer to locally downloaded files when available. Herdr exports substitute the paths returned by the target machine. Markdown is text; it does not embed image bytes.
 
 ## Screenshots
 
-Screenshots are saved as PNG files to your Downloads folder under `visual-annotator/`:
+Screenshots capture the visible browser tab, then crop around the selected element with padding, bounded by the viewport. They do not capture the full scrollable page or portions of an element outside the viewport. Annotation highlights and markers are hidden during capture, and the popup is temporarily hidden.
 
-- Regular sites: `{domain-and-path}-{timestamp}.png` (e.g. `flow-digitalsprung-de-home-1743564000000.png`)
-- Localhost: `localhost-{port}-{path}-{timestamp}.png` (e.g. `localhost-3000-dashboard-1743564000000.png`)
+- **Copy with screenshot:** saves a PNG under the browser's Downloads directory in `visual-annotator/`, using a sanitized site/path and timestamp. The resolved file path is included when available.
+- **Send to Herdr:** uploads the image to the selected agent's machine without requiring a Downloads file. Previously captured screenshots in the batch can also be sent.
+- Screenshots remain associated with their annotation and are reused unless the selected target changes or a new annotation is created.
 
-## Privacy
+## Privacy and permissions
 
-- All data stays in your browser — no network requests, no tracking, no analytics
-- Screenshots are captured locally via Chrome's `captureVisibleTab` API and saved to your Downloads folder
-- Console logs are captured in-page — nothing is sent to any server
+There is no tracking, analytics, or hosted application backend.
 
-## Development
+- Annotations, comments, and screenshot data stay in page memory until exported, sent, or the page is unloaded. They are not restored after a reload.
+- Copy uses the system clipboard; screenshot copies can also save local files. The popup may read clipboard text to decide whether to offer **Add to existing annotations**.
+- **Send to Herdr** explicitly transfers the current batch and screenshots through the local bridge to the selected agent. Remote transfers use herdr-core's configured machine connection.
+- The last successfully used Herdr terminal address is stored in browser extension local storage.
 
-```bash
-# Make changes to content.js, background.js, popup.js, or manifest.json
-# Then reload the extension in chrome://extensions
+| Permission | Purpose |
+|------------|---------|
+| `activeTab`, `scripting` | Activate/inject the picker and capture the selected tab |
+| `<all_urls>` host access | Make the content script available on supported web pages |
+| `downloads` | Save screenshots used by Copy exports |
+| `nativeMessaging` | Connect to the optional local Herdr bridge |
+| `storage` | Remember the last successful Herdr target |
+
+Only install a bridge from a source you trust: it runs locally with your user's access and communicates with Herdr. The provided host exposes fixed annotation operations rather than arbitrary shell commands.
+
+## Development and verification
+
+The extension is plain JavaScript with no build step. Main components:
+
+| File | Responsibility |
+|------|----------------|
+| `content.js` | Element selection, top-layer UI, annotation batches, screenshot cropping, Markdown and Herdr panel |
+| `background.js` | Browser action/badge, screenshot capture/download, Native Messaging connection and message validation |
+| `manifest.json` | Extension entry points, permissions and selection shortcut |
+| `native/host.cjs` | Native Messaging framing, agent discovery, attachment upload and core submission |
+| `native/install.cjs` | Browser-specific macOS registration and scoped uninstall |
+
+Run automated checks with Node.js 18 or newer:
+
+```sh
+node --test background.test.cjs native/host.test.cjs
+node --check content.js
+node --check background.js
+node --check native/host.cjs
+node --check native/install.cjs
+git diff --check
 ```
 
-No build step required. The extension is plain JavaScript.
+Tests cover Native Messaging framing, core RPC via mock subprocesses, target validation, attachment limits, request caching, unknown submission results, background connection handling, and per-browser installation/uninstallation in temporary directories.
+
+Runtime verification to date includes real hc handshake/health/agent discovery and browser UI tests with a simulated bridge, including native dialogs/popovers and screenshot path substitution. Actual browser-to-agent submission and remote screenshot delivery still require end-to-end verification; installer tests alone do not establish browser compatibility.
+
+After code changes, reload the extension and refresh the target page. For manual checks, cover ordinary pages, native dialogs/popovers, batch editing, Copy, screenshot files, agent selection, failed sends and a test agent's receipt of submitted Markdown and readable attachments.
 
 ## License
 

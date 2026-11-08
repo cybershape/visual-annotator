@@ -65,6 +65,108 @@ chrome.commands.onCommand.addListener(async (command) => {
   }
 });
 
+let herdrPort = null;
+let herdrIdleTimer = null;
+const herdrRequests = new Map();
+
+function herdrError(code, message) {
+  return Object.assign(new Error(message), { code });
+}
+
+function scheduleHerdrDisconnect() {
+  clearTimeout(herdrIdleTimer);
+  if (herdrRequests.size) return;
+  herdrIdleTimer = setTimeout(() => {
+    const port = herdrPort;
+    herdrPort = null;
+    port?.disconnect();
+  }, 60000);
+}
+
+function requestHerdr(operation, args = {}) {
+  clearTimeout(herdrIdleTimer);
+  return new Promise((resolve, reject) => {
+    try {
+      if (!herdrPort) {
+        const port = chrome.runtime.connectNative("com.visual_annotator.herdr");
+        herdrPort = port;
+        port.onMessage.addListener((message) => {
+          const pending = herdrRequests.get(message.requestId);
+          if (!pending || message.version !== 1) return;
+          clearTimeout(pending.timer);
+          herdrRequests.delete(message.requestId);
+          if (message.error) pending.reject(herdrError(message.error.code, message.error.message));
+          else pending.resolve(message.result);
+          scheduleHerdrDisconnect();
+        });
+        port.onDisconnect.addListener(() => {
+          const reason = chrome.runtime.lastError?.message || "Herdr bridge disconnected.";
+          if (herdrPort !== port) return;
+          herdrPort = null;
+          for (const pending of herdrRequests.values()) {
+            clearTimeout(pending.timer);
+            pending.reject(herdrError(pending.operation === "sendAnnotation" ? "SEND_UNKNOWN" : "BRIDGE_DISCONNECTED", reason));
+          }
+          herdrRequests.clear();
+        });
+      }
+      const requestId = crypto.randomUUID();
+      const timer = setTimeout(() => {
+        herdrRequests.delete(requestId);
+        reject(herdrError(operation === "sendAnnotation" ? "SEND_UNKNOWN" : "BRIDGE_TIMEOUT", "Herdr bridge timed out."));
+        scheduleHerdrDisconnect();
+      }, 120000);
+      herdrRequests.set(requestId, { resolve, reject, timer, operation });
+      try {
+        herdrPort.postMessage({ version: 1, requestId, operation, ...args });
+      } catch (error) {
+        clearTimeout(timer);
+        herdrRequests.delete(requestId);
+        reject(herdrError("BRIDGE_UNAVAILABLE", error.message));
+        scheduleHerdrDisconnect();
+      }
+    } catch (error) {
+      reject(herdrError("BRIDGE_UNAVAILABLE", error.message));
+    }
+  });
+}
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg?.type !== "HERDR_REQUEST") return;
+  if (sender.id !== chrome.runtime.id || !sender.tab?.id || sender.frameId !== 0) {
+    sendResponse({ error: { code: "INVALID_SOURCE", message: "Only the page annotation panel can use Herdr." } });
+    return;
+  }
+  const run = async () => {
+    if (msg.operation === "listAgents") {
+      const result = await requestHerdr("listAgents");
+      const saved = await chrome.storage.local.get("herdrTarget");
+      return { ...result, selected: result.selected || saved.herdrTarget || null };
+    }
+    if (typeof msg.terminal !== "string" || !/^(?:[\w.-]+\/)?t[a-z0-9]+$/.test(msg.terminal)) {
+      throw herdrError("INVALID_TARGET", "Select a valid Herdr agent.");
+    }
+    if (msg.operation === "uploadAttachment") {
+      if (typeof msg.dataUrl !== "string" || msg.dataUrl.length > 12 * 1024 * 1024 ||
+          !msg.dataUrl.startsWith("data:image/png;base64,") || typeof msg.attachmentId !== "string" || msg.attachmentId.length > 100) {
+        throw herdrError("INVALID_ATTACHMENT", "Invalid PNG screenshot or screenshot exceeds 8 MB.");
+      }
+      return requestHerdr("uploadAttachment", { terminal: msg.terminal, attachmentId: msg.attachmentId, dataUrl: msg.dataUrl });
+    }
+    if (msg.operation === "sendAnnotation") {
+      if (typeof msg.markdown !== "string" || !msg.markdown.trim() || msg.markdown.length > 1024 * 1024) {
+        throw herdrError("INVALID_ANNOTATION", "Annotation is empty or exceeds 1 MB.");
+      }
+      const result = await requestHerdr("sendAnnotation", { terminal: msg.terminal, markdown: msg.markdown });
+      await chrome.storage.local.set({ herdrTarget: msg.terminal }).catch(() => {});
+      return result;
+    }
+    throw herdrError("INVALID_OPERATION", "Unknown Herdr operation.");
+  };
+  run().then((result) => sendResponse({ result }), (error) => sendResponse({ error: { code: error.code || "BRIDGE_ERROR", message: error.message } }));
+  return true;
+});
+
 // Messages from content script
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === "ANNOTATION_STATE" && sender.tab?.id && sender.frameId === 0) {

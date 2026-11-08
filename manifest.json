@@ -7,7 +7,9 @@
   "permissions": [
     "activeTab",
     "scripting",
-    "downloads"
+    "downloads",
+    "nativeMessaging",
+    "storage"
   ],
   "host_permissions": [
     "<all_urls>"
