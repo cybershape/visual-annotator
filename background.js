@@ -12,18 +12,31 @@ function isRestrictedUrl(url) {
   return /^(chrome|chrome-extension|edge|about|devtools|view-source):/.test(url);
 }
 
-async function toggleAnnotations(tab) {
-  if (!tab?.id || isRestrictedUrl(tab.url)) {
-    return;
-  }
+const pendingToggles = new Map();
 
+function toggleAnnotations(tab) {
+  if (!tab?.id || isRestrictedUrl(tab.url)) return;
+  const tabId = tab.id;
+  const previous = pendingToggles.get(tabId) || Promise.resolve();
+  const toggle = previous.then(() => toggleTabAnnotations(tabId)).catch((error) => {
+    console.error("[visual-annotator] Toggle failed:", error.message);
+  });
+  pendingToggles.set(tabId, toggle);
+  return toggle.finally(() => {
+    if (pendingToggles.get(tabId) === toggle) pendingToggles.delete(tabId);
+  });
+}
+
+async function toggleTabAnnotations(tabId) {
+  let active = false;
   // Ensure content script is injected
   try {
-    await chrome.tabs.sendMessage(tab.id, { type: "PING" });
+    const resp = await chrome.tabs.sendMessage(tabId, { type: "PING" }, { frameId: 0 });
+    active = !!resp?.active;
   } catch {
     try {
       await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
+        target: { tabId, allFrames: true },
         files: ["content.js"],
       });
       await new Promise((r) => setTimeout(r, 150));
@@ -33,7 +46,7 @@ async function toggleAnnotations(tab) {
     }
   }
 
-  await chrome.tabs.sendMessage(tab.id, { type: "TOGGLE_ANNOTATING" }).catch(() => {});
+  await chrome.tabs.sendMessage(tabId, { type: "SET_ANNOTATING", active: !active });
 }
 
 async function updateActionState(tabId, active, count) {
@@ -60,7 +73,8 @@ chrome.action.onClicked.addListener((tab) => {
 // Keyboard shortcut
 chrome.commands.onCommand.addListener(async (command) => {
   if (command === "toggle-toolbar") {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    let [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab) [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
     if (tab) toggleAnnotations(tab);
   }
 });
@@ -171,6 +185,44 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === "ANNOTATION_STATE" && sender.tab?.id && sender.frameId === 0) {
     updateActionState(sender.tab.id, msg.active === true, Math.max(0, Math.floor(Number(msg.count) || 0)));
+    return;
+  }
+
+  if (msg.type === "SYNC_CHILD_STATE" && sender.tab?.id && sender.frameId > 0) {
+    chrome.tabs.sendMessage(sender.tab.id, { type: "PING" }, { frameId: 0 })
+      .then((resp) => sendResponse({ active: !!resp?.active, popupOpen: !!resp?.popupOpen }))
+      .catch(() => sendResponse({ active: false, popupOpen: false }));
+    return true;
+  }
+
+  if (msg.type === "FRAME_ELEMENT_CLICKED" && sender.tab?.id && sender.frameId > 0) {
+    chrome.tabs.sendMessage(sender.tab.id, {
+      type: "OPEN_FRAME_POPUP", payload: msg.payload, frameId: sender.frameId, documentId: sender.documentId,
+    }, { frameId: 0 })
+      .then(() => sendResponse({ ok: true }))
+      .catch(() => sendResponse({ ok: false }));
+    return true;
+  }
+
+  if (msg.type === "REQUEST_FRAME_GEOMETRY" && sender.tab?.id && sender.frameId === 0 && msg.frameId > 0) {
+    chrome.tabs.sendMessage(sender.tab.id, {
+      type: "READ_FRAME_GEOMETRY", elementIds: msg.elementIds, requestId: msg.requestId,
+    }, { frameId: msg.frameId, documentId: msg.documentId }).then(sendResponse, () => sendResponse(null));
+    return true;
+  }
+
+  if (msg.type === "POPUP_STATE" && sender.tab?.id && sender.frameId === 0) {
+    chrome.tabs.sendMessage(sender.tab.id, { type: "REMOTE_POPUP_STATE", open: msg.open === true }).catch(() => {});
+    return;
+  }
+
+  if (msg.type === "CLOSE_POPUP" && sender.tab?.id && sender.frameId > 0) {
+    chrome.tabs.sendMessage(sender.tab.id, { type: "CLOSE_POPUP" }, { frameId: 0 }).catch(() => {});
+    return;
+  }
+
+  if (msg.type === "SET_ANNOTATING_ALL" && sender.tab?.id) {
+    chrome.tabs.sendMessage(sender.tab.id, { type: "SET_ANNOTATING", active: msg.active === true }).catch(() => {});
     return;
   }
 
