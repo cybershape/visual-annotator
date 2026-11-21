@@ -56,6 +56,9 @@
   // Element picker
   let hoverStack = [];
   let stackIdx = 0;
+  let pendingPointerId = null;
+  let suppressPointerClick = false;
+  let suppressClickTimer = null;
 
   // DOM refs
   let highlightEl = null;
@@ -271,6 +274,8 @@ input[type=checkbox] { width:16px; height:16px; margin:0; accent-color:var(--acc
 
   const GLOBAL_CSS = `
 html.va-annotating, html.va-annotating *, body.va-annotating, body.va-annotating * { cursor: crosshair !important; }
+html.va-annotating :is(:disabled, [disabled], [aria-disabled="true"]):not([data-va]),
+body.va-annotating :is(:disabled, [disabled], [aria-disabled="true"]):not([data-va]) { pointer-events: auto !important; }
 va-marker.va-marker {
   all: initial;
   position: fixed !important; z-index: ${Z_MARKERS} !important;
@@ -564,20 +569,29 @@ va-marker.va-marker.has-screenshot { background: #22c55e !important; box-shadow:
 
   // ─── Annotate Mode ──────────────────────────────────────────────────
 
+  function resetPointerState() {
+    pendingPointerId = null;
+    suppressPointerClick = false;
+    clearTimeout(suppressClickTimer);
+    suppressClickTimer = null;
+  }
+
   function setAnnotating(active) {
     if (isAnnotating === active) return;
     isAnnotating = active;
     hoverStack = [];
     stackIdx = 0;
+    resetPointerState();
     updateActionState();
     document.documentElement?.classList.toggle("va-annotating", isAnnotating);
     document.body?.classList.toggle("va-annotating", isAnnotating);
 
     if (isAnnotating) {
       window.addEventListener("mousemove", onMouseMove, true);
-      window.addEventListener("pointerdown", onPointerBlock, true);
+      window.addEventListener("pointerdown", onPointerDown, true);
       window.addEventListener("mousedown", onPointerBlock, true);
-      window.addEventListener("pointerup", onPointerBlock, true);
+      window.addEventListener("pointerup", onPointerUp, true);
+      window.addEventListener("pointercancel", onPointerCancel, true);
       window.addEventListener("mouseup", onPointerBlock, true);
       window.addEventListener("click", onClick, true);
       window.addEventListener("wheel", onWheel, { passive: false, capture: true });
@@ -585,9 +599,10 @@ va-marker.va-marker.has-screenshot { background: #22c55e !important; box-shadow:
       window.addEventListener("mouseout", onWindowMouseOut, true);
     } else {
       window.removeEventListener("mousemove", onMouseMove, true);
-      window.removeEventListener("pointerdown", onPointerBlock, true);
+      window.removeEventListener("pointerdown", onPointerDown, true);
       window.removeEventListener("mousedown", onPointerBlock, true);
-      window.removeEventListener("pointerup", onPointerBlock, true);
+      window.removeEventListener("pointerup", onPointerUp, true);
+      window.removeEventListener("pointercancel", onPointerCancel, true);
       window.removeEventListener("mouseup", onPointerBlock, true);
       window.removeEventListener("click", onClick, true);
       window.removeEventListener("wheel", onWheel, { capture: true });
@@ -598,7 +613,51 @@ va-marker.va-marker.has-screenshot { background: #22c55e !important; box-shadow:
     }
   }
 
+  function onPointerDown(e) {
+    suppressPointerClick = false;
+    clearTimeout(suppressClickTimer);
+    suppressClickTimer = null;
+    if (isOursEvent(e) || isPopupOpen()) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (e.button === 0 && e.isPrimary !== false) {
+      pendingPointerId = e.pointerId;
+    }
+  }
+
+  function onPointerUp(e) {
+    const matchesPending = pendingPointerId !== null && e.pointerId === pendingPointerId && e.button === 0;
+    if (matchesPending) pendingPointerId = null;
+    if (isOursEvent(e) || isPopupOpen()) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (!matchesPending) return;
+
+    suppressPointerClick = true;
+    clearTimeout(suppressClickTimer);
+    suppressClickTimer = setTimeout(() => {
+      suppressPointerClick = false;
+      suppressClickTimer = null;
+    }, 100);
+
+    selectTargetFromEvent(e, false);
+  }
+
+  function onPointerCancel(e) {
+    if (pendingPointerId !== null && e.pointerId === pendingPointerId) {
+      pendingPointerId = null;
+    }
+    if (isOursEvent(e) || isPopupOpen()) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+  }
+
   function onPointerBlock(e) {
+    if (suppressPointerClick && e.type === "mouseup") {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      return;
+    }
     if (isOursEvent(e) || isPopupOpen()) return;
     e.preventDefault();
     e.stopImmediatePropagation();
@@ -667,14 +726,9 @@ va-marker.va-marker.has-screenshot { background: #22c55e !important; box-shadow:
     showTooltip(hoverStack[stackIdx], e.clientX, e.clientY);
   }
 
-  function onClick(e) {
-    if (isOursEvent(e) || isPopupOpen()) return;
-    e.preventDefault();
-    e.stopImmediatePropagation();
-
+  function selectTargetFromEvent(e, isKeyboardClick) {
     let el = hoverStack[stackIdx];
     if (!el || !document.contains(el)) {
-      const isKeyboardClick = e.detail === 0 && e.clientX === 0 && e.clientY === 0;
       const fallback = isKeyboardClick && e.target instanceof Element ? e.target : null;
       const stack = fallback
         ? (!isOurs(fallback) && fallback !== document.body && fallback !== document.documentElement ? buildHoverStack(fallback) : [])
@@ -699,6 +753,23 @@ va-marker.va-marker.has-screenshot { background: #22c55e !important; box-shadow:
       type: "FRAME_ELEMENT_CLICKED",
       payload: { items: serializeFrameChain(chain) },
     }).catch(() => {});
+  }
+
+  function onClick(e) {
+    const isKeyboardClick = e.detail === 0 && e.clientX === 0 && e.clientY === 0;
+    if (suppressPointerClick && !isKeyboardClick) {
+      suppressPointerClick = false;
+      clearTimeout(suppressClickTimer);
+      suppressClickTimer = null;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      return;
+    }
+    if (isOursEvent(e) || isPopupOpen()) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+
+    selectTargetFromEvent(e, isKeyboardClick);
   }
 
   function onAnnotateKeyDown(e) {
